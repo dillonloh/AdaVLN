@@ -9,6 +9,7 @@
 import random
 import time
 
+import cv2  
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
@@ -18,13 +19,47 @@ from omni.isaac.examples.base_sample import BaseSample
 from omni.isaac.wheeled_robots.robots import WheeledRobot
 from omni.isaac.wheeled_robots.controllers import DifferentialController, WheelBasePoseController
 from omni.isaac.core.objects import VisualCuboid
+import omni.isaac.core.utils.prims as prims_utils
+from omni.isaac.sensor import Camera
+import omni.isaac.core.utils.numpy.rotations as rot_utils
 import carb
 
+
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+
+
+class ROS2PublisherNode(Node):
+    def __init__(self):
+        super().__init__("ros2_publisher_node")
+        self.bridge = CvBridge()
+        self.rgb_publisher = self.create_publisher(Image, "/rgb", 10)
+        self.depth_publisher = self.create_publisher(Image, "/depth", 10)
+
+    def publish_camera_data(self, rgb_data, depth_data):
+        # Convert to numpy arrays to avoid any data persistence issues and ensure compatibility
+        rgb_array = np.array(rgb_data, dtype=np.float32)
+        depth_array = np.array(depth_data, dtype=np.float32)
+        rgb_array = cv2.cvtColor(rgb_array.astype(np.uint8), cv2.COLOR_BGR2RGB)
+
+        # Scale and convert RGB data to 8-bit format
+        rgb_msg = self.bridge.cv2_to_imgmsg((rgb_array * 255).astype(np.uint8), encoding='rgb8')
+        depth_msg = self.bridge.cv2_to_imgmsg(depth_array, encoding='32FC1')
+
+        # Publish the converted messages
+        self.rgb_publisher.publish(rgb_msg)
+        self.depth_publisher.publish(depth_msg)
 
 class SuperHotVLN(BaseSample):
     def __init__(self) -> None:
         super().__init__()
         self._moving_objects = []
+        if not rclpy.ok():
+            rclpy.init()
+        self.ros2_node = ROS2PublisherNode()  # Initialize the ROS2 node for publishing
+
         return
 
     def setup_scene(self):
@@ -40,6 +75,17 @@ class SuperHotVLN(BaseSample):
         # jetbot_asset_path = assets_root_path + "/Isaac/Robots/Jetbot/jetbot.usd"
         jetbot_prim_path = "/World/Jetbot"
         
+        # Add the Jetbot camera
+        camera_prim_path = "/World/Jetbot/chassis/rgb_camera/jetbot_camera"
+
+        world.scene.add(
+            Camera(
+                prim_path=camera_prim_path,
+                name="jetbot_camera",
+                resolution=(1280, 720),
+            )
+        )
+
         # Add the Jetbot robot
         world.scene.add(
             WheeledRobot(
@@ -49,7 +95,7 @@ class SuperHotVLN(BaseSample):
                 position=[0.0, 0.0, 0.0]
             )
         )
-        
+
         # Add random moving objects (e.g., cubes)
         for i in range(5):  # Add 5 random objects
             random_position = [random.uniform(-5, 5), random.uniform(-5, 5), 0.5]
@@ -71,18 +117,41 @@ class SuperHotVLN(BaseSample):
         self._start_time = time.time()
         self._world = self.get_world()
         self._jetbot = self._world.scene.get_object("jetbot")
-        self._world.add_physics_callback("sending_actions", callback_fn=self.send_robot_actions)
+
+
         self._world.add_physics_callback("moving_objects", callback_fn=self.move_objects_in_random_paths)
+        # self._world.add_physics_callback("publish_camera_data", callback_fn=self.publish_camera_data)
+        self._world.add_physics_callback("sending_actions", callback_fn=self.send_robot_actions)
         self._jetbot_controller = DifferentialController(name="jetbot_control", wheel_radius=0.035, wheel_base=0.1)
         self._current_command = None
         self._target_position = None
         self._target_yaw = None
+        self._camera = self._world.scene.get_object("jetbot_camera")   
+        
+        self._camera.initialize()
+        self._camera.add_motion_vectors_to_frame()
+        self._camera.add_distance_to_image_plane_to_frame()
+        self.bridge = CvBridge()
+        
+
+    def publish_camera_data(self):
+        print("Publishing camera data...")
+        # Capture RGB and Depth images from the camera
+        rgb_data = self._camera.get_rgb()
+        depth_data = self._camera.get_depth()
+        print(f"Type of RGB data: {type(rgb_data)} | Type of Depth data: {type(depth_data)}")
+        print(f"RGB data shape: {rgb_data.shape} | Depth data shape: {depth_data.shape}")
+        print(f"RGB data type: {rgb_data.dtype} | Depth data type: {depth_data.dtype}")
+        print(f"RGB data range: {rgb_data}")
+        # Publish the data using ROS2PublisherNode
+        self.ros2_node.publish_camera_data(rgb_data, depth_data)
 
     def normalize_angle(self, angle):
         """Normalize an angle to the range [-pi, pi]."""
         return (angle + np.pi) % (2 * np.pi) - np.pi
 
     def move_objects_in_random_paths(self, step_size):
+        print("Moving objects in random paths...")
         # Move each object in a random direction with a small step size
         for i, obj in enumerate(self._moving_objects):
             # Generate a random direction and move the object slightly
@@ -93,6 +162,7 @@ class SuperHotVLN(BaseSample):
             obj.set_world_pose(new_position.tolist(), current_orientation)
 
     def send_robot_actions(self, step_size):
+        print("Sending robot actions...")
         # Get the current position and orientation (in quaternion) of the robot
         position, orientation_quat = self._jetbot.get_world_pose()
 
@@ -102,9 +172,10 @@ class SuperHotVLN(BaseSample):
         current_yaw = (euler_angles[2])  # Yaw is the third Euler angle (rotation around Z-axis)
         print(f"Current yaw: {(current_yaw)} radians | Target yaw: {(self._target_yaw)} radians")
 
-        # If no command is active, pause the simulation
+        # If no command is active, publish camera data and then pause the simulation
         if self._current_command is None:
-            print("No command found, pausing simulation.")
+            print("No command found, publishing camera data and pausing simulation.")
+            self.publish_camera_data()  # Publish camera data right before pausing
             self._world.pause()
             return
 
@@ -178,4 +249,6 @@ class SuperHotVLN(BaseSample):
         self._prev_yaw = None
 
     def world_cleanup(self):
-        return
+        # Ensure ROS2 is shut down when the world is cleaned up
+        if rclpy.ok():
+            rclpy.shutdown()
