@@ -24,19 +24,48 @@ from omni.isaac.sensor import Camera
 import omni.isaac.core.utils.numpy.rotations as rot_utils
 import carb
 
-
+    
 import rclpy
+import threading
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
+from std_msgs.msg import String
+from cv_bridge import CvBridge  
 
 
 class ROS2PublisherNode(Node):
-    def __init__(self):
+    def __init__(self, super_hot_vln):
         super().__init__("ros2_publisher_node")
         self.bridge = CvBridge()
-        self.rgb_publisher = self.create_publisher(Image, "/rgb", 10)
-        self.depth_publisher = self.create_publisher(Image, "/depth", 10)
+
+        # Set up QoS profile to keep only the last message
+        qos_profile = QoSProfile(
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,  # Only keep the last message
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL  # Ensures data is available to new subscribers
+        )
+
+        self.rgb_publisher = self.create_publisher(Image, "/rgb", qos_profile)
+        self.depth_publisher = self.create_publisher(Image, "/depth", qos_profile)
+        self.super_hot_vln = super_hot_vln
+
+        # Subscribe to the /command topic
+        self.command_subscription = self.create_subscription(
+            String,
+            "/command",
+            self.command_callback,
+            10
+        )
+
+    def command_callback(self, msg):
+        # Update the _current_command and resume simulation
+        print("Received command from agent:", msg.data)
+        command = msg.data
+        if command in ["turn_left", "turn_right", "move_forward"]:
+            self.super_hot_vln._current_command = command
+            self.super_hot_vln._world.play()  # Resume simulation if it's paused
 
     def publish_camera_data(self, rgb_data, depth_data):
         # Convert to numpy arrays to avoid any data persistence issues and ensure compatibility
@@ -58,7 +87,13 @@ class SuperHotVLN(BaseSample):
         self._moving_objects = []
         if not rclpy.ok():
             rclpy.init()
-        self.ros2_node = ROS2PublisherNode()  # Initialize the ROS2 node for publishing
+        self.ros2_node = ROS2PublisherNode(self)  # Initialize ROS2 node with self reference
+
+        # Create and start the ROS 2 executor on a separate thread
+        self.executor = MultiThreadedExecutor()
+        self.executor.add_node(self.ros2_node)
+        self.ros2_thread = threading.Thread(target=self.executor.spin, daemon=True)
+        self.ros2_thread.start()
 
         return
 
@@ -139,10 +174,10 @@ class SuperHotVLN(BaseSample):
         # Capture RGB and Depth images from the camera
         rgb_data = self._camera.get_rgb()
         depth_data = self._camera.get_depth()
-        print(f"Type of RGB data: {type(rgb_data)} | Type of Depth data: {type(depth_data)}")
-        print(f"RGB data shape: {rgb_data.shape} | Depth data shape: {depth_data.shape}")
-        print(f"RGB data type: {rgb_data.dtype} | Depth data type: {depth_data.dtype}")
-        print(f"RGB data range: {rgb_data}")
+        # print(f"Type of RGB data: {type(rgb_data)} | Type of Depth data: {type(depth_data)}")
+        # print(f"RGB data shape: {rgb_data.shape} | Depth data shape: {depth_data.shape}")
+        # print(f"RGB data type: {rgb_data.dtype} | Depth data type: {depth_data.dtype}")
+        # print(f"RGB data range: {rgb_data}")
         # Publish the data using ROS2PublisherNode
         self.ros2_node.publish_camera_data(rgb_data, depth_data)
 
@@ -250,5 +285,7 @@ class SuperHotVLN(BaseSample):
 
     def world_cleanup(self):
         # Ensure ROS2 is shut down when the world is cleaned up
+        self.executor.shutdown()
+        self.ros2_thread.join()
         if rclpy.ok():
             rclpy.shutdown()
