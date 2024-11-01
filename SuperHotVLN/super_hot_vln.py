@@ -85,6 +85,8 @@ class SuperHotVLN(BaseSample):
     def __init__(self) -> None:
         super().__init__()
         self._moving_objects = []
+        self._input_usd_path = None
+
         if not rclpy.ok():
             rclpy.init()
         self.ros2_node = ROS2PublisherNode(self)  # Initialize ROS2 node with self reference
@@ -101,7 +103,8 @@ class SuperHotVLN(BaseSample):
 
         world = self.get_world()
 
-        matterport_env_usd = "/home/dillon/0Research/IsaacSim/test.usd"
+        matterport_env_usd = self._input_usd_path
+        print(f"Loading Matterport environment from: {matterport_env_usd}")
         matterport_env_prim_path = "/World"
 
         add_reference_to_stage(usd_path=matterport_env_usd, prim_path=matterport_env_prim_path)

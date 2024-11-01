@@ -7,5 +7,5 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 
-from omni.isaac.examples.vln.super_hot_vln import SuperHotVLN
-from omni.isaac.examples.vln.super_hot_vln_extension import SuperHotVLNExtension
+from omni.isaac.examples.SuperHotVLN.super_hot_vln import SuperHotVLN
+from omni.isaac.examples.SuperHotVLN.super_hot_vln_extension import SuperHotVLNExtension

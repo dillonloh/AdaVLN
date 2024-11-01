@@ -11,8 +11,8 @@ import asyncio
 import os
 import omni.ui as ui
 from omni.isaac.examples.base_sample import BaseSampleExtension
-from omni.isaac.ui.ui_utils import btn_builder
-from omni.isaac.examples.vln.super_hot_vln import SuperHotVLN
+from omni.isaac.ui.ui_utils import btn_builder, str_builder
+from omni.isaac.examples.SuperHotVLN.super_hot_vln import SuperHotVLN
 
 class SuperHotVLNExtension(BaseSampleExtension):
     def on_startup(self, ext_id: str):
@@ -51,6 +51,10 @@ class SuperHotVLNExtension(BaseSampleExtension):
         self.sample._world.play()  # Ensure simulation starts or resumes
         return
 
+    def _input_usd_path_event(self, val):
+        self.sample._input_usd_path = val.get_value_as_string()
+        return
+    
     def post_reset_button_event(self):
         self.task_ui_elements["Move Forward"].enabled = True
         self.task_ui_elements["Turn Left"].enabled = True
@@ -96,3 +100,13 @@ class SuperHotVLNExtension(BaseSampleExtension):
                 }
                 self.task_ui_elements["Turn Right"] = btn_builder(**turn_right_dict)
                 self.task_ui_elements["Turn Right"].enabled = True
+                
+                dict = {
+                    "label": "Input USD Path",
+                    "type": "stringfield",
+                    "tooltip": "Input USD Path",
+                    "on_clicked_fn": self._input_usd_path_event,
+                    "use_folder_picker": True,
+                    "read_only": False,
+                }
+                self.task_ui_elements["Input USD Path"] = str_builder(**dict)
