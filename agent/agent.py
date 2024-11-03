@@ -1,4 +1,5 @@
 import base64
+import json
 
 import rclpy
 from rclpy.node import Node
@@ -100,11 +101,19 @@ class RGBDCommandNode(Node):
 
         # Prepare OpenAI API call with the images and prompt
         prompt = '''
-            Your current job is to move forward until you see a chair. Then, turn left until you face a hallway, then stop.
-            You must choose from one of the following options, and ONLY return the chosen option with NO OTHER text.
-            (Options: turn_left, move_forward, turn_right, stop)
+            Your job is to control a robot with the following instructions:
+            - Move forward until you see a chair.
+            - Turn left until you face a hallway, then stop.
 
+            Choose the best decision based on the provided images and return a JSON response with exactly these two fields:
+            {
+                "decision": "turn_left/move_forward/turn_right/stop",
+                "reasoning": "Explanation of the choice"
+            }
+
+            DO NOT RETURN ANYTHING ELSE. START WITH { AND END WITH }. DO NOT ADD UNNECESSARY ``` OR OTHER FORMATTING.
         '''
+
         messages = [
             {
                 "role": "user",
@@ -130,16 +139,31 @@ class RGBDCommandNode(Node):
 
         try:
             # Call the OpenAI API
-            response = client.chat.completions.create(model="gpt-4o",  # Adjust if needed
-            messages=messages,
-            max_tokens=10)
-            print(f"OpenAI response: {response.choices[0].message.content}")
-            command = response.choices[0].message.content.strip()
-            if command in ['turn_left', 'move_forward', 'turn_right']:
-                return command
+            response = client.chat.completions.create(
+                model="gpt-4o",  # Adjust model as needed
+                messages=messages,
+                max_tokens=50,  # Adjust tokens for JSON output
+                response_format={ "type": "json_object" }
+            )
+
+            # Parse JSON response
+            content = response.choices[0].message.content.strip()
+            parsed_response = json.loads(content)
+            print(parsed_response)
+            # Extract decision and reasoning
+            decision = parsed_response.get("decision")
+            reasoning = parsed_response.get("reasoning")
+            
+            # Ensure decision is valid
+            if decision in ['turn_left', 'move_forward', 'turn_right', 'stop']:
+                print(f"OpenAI Decision: {decision}, Reasoning: {reasoning}")
+                return decision
             else:
-                self.get_logger().warning(f"Invalid command received: {command}")
+                self.get_logger().warning(f"Invalid decision received: {decision}")
                 return None
+        except json.JSONDecodeError as e:
+            self.get_logger().error(f"Failed to parse JSON from OpenAI response: {e}")
+            return None
         except Exception as e:
             self.get_logger().error(f"Error with OpenAI API: {e}")
             return None
