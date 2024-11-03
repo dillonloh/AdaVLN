@@ -3,7 +3,7 @@
         "distance": 10.86,
         "scan": "GLAQ4DNUx5",
         "heading": 3.14,
-        "start_position": [0.0, 0.0, 0.0],
+        "start_position": [0.0, 0.0, 0.2],
         "instructions": [
             "Move forward until you reach the first doorway on your left",
             "Turn left and and head through the hallway to the room on the other end and stop in front of the white chair",
