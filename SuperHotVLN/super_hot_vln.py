@@ -233,7 +233,7 @@ class SuperHotVLN(BaseSample):
         # Handle the stop command: stop the robot and pause simulation
         if self._current_command == "stop":
             print("Stop command received. Stopping robot and pausing simulation.")
-            self._jetbot.apply_wheel_actions([0.0, 0.0])  # Stop the robot's wheels
+            self._jetbot.apply_wheel_actions(self._jetbot_controller.forward([0.0, 0.0]))  # Stop the robot's wheels
             self.publish_camera_data()  # Publish final camera data
             self._world.pause()  # Pause the simulation
             self._current_command = None  # Reset command
