@@ -5,9 +5,11 @@
         "heading": 3.14,
         "start_position": [0.0, 0.0, 0.0],
         "instructions": [
-            "Walk straight ahead until you reach a chair.",
-            "Turn left and and head towards the hallway entrance.",
-            "Go through the hallway entrance all the way into the other room and stop in front of the ladder"
-        ]
+            "Move forward until you reach the first doorway on your left",
+            "Turn left and and head through the hallway to the room on the other end and stop in front of the white chair",
+            "Turn left and head into the bathroom and stop in front of the heater"
+        ],
+        "destination": [10.86, 0.0, 0.0]
+         
     }
 ]

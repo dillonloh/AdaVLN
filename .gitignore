@@ -162,4 +162,3 @@ cython_debug/
 #.idea/
 
 # Datasets
-example_dataset/merged
