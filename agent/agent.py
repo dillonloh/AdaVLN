@@ -100,11 +100,9 @@ class RGBDCommandNode(Node):
 
         # Prepare OpenAI API call with the images and prompt
         prompt = '''
-            Your current job is to navigate to the first dining table's chair in front of you and stop about 1 meter away from it.
-            You then turn left 90 degrees until you are facing a hallway.
-            Now move to the entrance of the hallway.
+            Your current job is to move forward until you see a chair. Then, turn left until you face a hallway, then stop.
             You must choose from one of the following options, and ONLY return the chosen option with NO OTHER text.
-            (Options: turn_left, move_forward, turn_right)
+            (Options: turn_left, move_forward, turn_right, stop)
 
         '''
         messages = [

@@ -66,7 +66,7 @@ class ROS2PublisherNode(Node):
         # Update the _current_command and resume simulation
         print("Received command from agent:", msg.data)
         command = msg.data
-        if command in ["turn_left", "turn_right", "move_forward"]:
+        if command in ["turn_left", "turn_right", "move_forward", "stop"]:
             self.super_hot_vln._current_command = command
             self.super_hot_vln._world.play()  # Resume simulation if it's paused
 
@@ -230,6 +230,15 @@ class SuperHotVLN(BaseSample):
         current_yaw = (euler_angles[2])  # Yaw is the third Euler angle (rotation around Z-axis)
         print(f"Current yaw: {(current_yaw)} radians | Target yaw: {(self._target_yaw)} radians")
 
+        # Handle the stop command: stop the robot and pause simulation
+        if self._current_command == "stop":
+            print("Stop command received. Stopping robot and pausing simulation.")
+            self._jetbot.apply_wheel_actions([0.0, 0.0])  # Stop the robot's wheels
+            self.publish_camera_data()  # Publish final camera data
+            self._world.pause()  # Pause the simulation
+            self._current_command = None  # Reset command
+            return
+        
         # If no command is active, publish camera data and then pause the simulation
         if self._current_command is None:
             print("No command found, publishing camera data and pausing simulation.")
@@ -292,8 +301,6 @@ class SuperHotVLN(BaseSample):
                 throttle, steering = 0, -1  # Turn right
                 print(f"Turning right: yaw difference = {yaw_diff} radians")
                 self._jetbot.apply_wheel_actions(self._jetbot_controller.forward([throttle, steering]))
-
-
 
     async def setup_pre_reset(self):
         return
