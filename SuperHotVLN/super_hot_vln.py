@@ -6,6 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+import json
 import random
 import time
 
@@ -15,6 +16,7 @@ from scipy.spatial.transform import Rotation as R
 
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.nucleus import get_assets_root_path
+from omni.isaac.core.utils.numpy import rotvecs_to_quats
 from omni.isaac.examples.base_sample import BaseSample
 from omni.isaac.wheeled_robots.robots import WheeledRobot
 from omni.isaac.wheeled_robots.controllers import DifferentialController, WheelBasePoseController
@@ -22,6 +24,7 @@ from omni.isaac.core.objects import VisualCuboid
 import omni.isaac.core.utils.prims as prims_utils
 from omni.isaac.sensor import Camera
 import omni.isaac.core.utils.numpy.rotations as rot_utils
+import omni.kit.actions.core
 import carb
 
     
@@ -86,6 +89,10 @@ class SuperHotVLN(BaseSample):
         super().__init__()
         self._moving_objects = []
         self._input_usd_path = None
+        self._task_details_path = None
+        self._task_details_list = None
+        self._task_num = 0
+        self._current_task = None
 
         if not rclpy.ok():
             rclpy.init()
@@ -102,17 +109,46 @@ class SuperHotVLN(BaseSample):
     def setup_scene(self):
 
         world = self.get_world()
-
+        
         matterport_env_usd = self._input_usd_path
+        task_details_path = self._task_details_path
+        with open(task_details_path, "r") as f:
+            self._task_details_list = json.load(f)
+        
+        self._current_task = self._task_details_list[self._task_num]
+
+        print(f"Task details: {self._task_details_list}")
+        print(f"Current task: {self._current_task}")
         print(f"Loading Matterport environment from: {matterport_env_usd}")
+        
         matterport_env_prim_path = "/World"
 
         add_reference_to_stage(usd_path=matterport_env_usd, prim_path=matterport_env_prim_path)
         assets_root_path = get_assets_root_path()
 
-        # jetbot_asset_path = assets_root_path + "/Isaac/Robots/Jetbot/jetbot.usd"
-        jetbot_prim_path = "/World/Jetbot"
+        action_registry = omni.kit.actions.core.get_action_registry()
+        action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_stage")
+        action.execute()
         
+        jetbot_asset_path = assets_root_path + "/Isaac/Robots/Jetbot/jetbot.usd"
+        jetbot_prim_path = "/World/Jetbot"
+        start_position = self._current_task["start_position"]
+        start_orientation = rotvecs_to_quats([0, 0, self._current_task["heading"]])
+        print(f"Start position: {start_position} | Start orientation: {start_orientation}")
+
+        # Add the Jetbot robot
+        world.scene.add(
+            WheeledRobot(
+                prim_path=jetbot_prim_path,
+                wheel_dof_names=["left_wheel_joint", "right_wheel_joint"],
+                name="jetbot", 
+                usd_path=jetbot_asset_path,
+                position=start_position,
+                orientation=start_orientation,
+                create_robot=True
+            )
+        )
+
         # Add the Jetbot camera
         camera_prim_path = "/World/Jetbot/chassis/rgb_camera/jetbot_camera"
 
@@ -121,16 +157,6 @@ class SuperHotVLN(BaseSample):
                 prim_path=camera_prim_path,
                 name="jetbot_camera",
                 resolution=(1280, 720),
-            )
-        )
-
-        # Add the Jetbot robot
-        world.scene.add(
-            WheeledRobot(
-                prim_path=jetbot_prim_path,
-                wheel_dof_names=["left_wheel_joint", "right_wheel_joint"],
-                name="jetbot", 
-                position=[0.0, 0.0, 0.0]
             )
         )
 
@@ -156,7 +182,6 @@ class SuperHotVLN(BaseSample):
         self._world = self.get_world()
         self._jetbot = self._world.scene.get_object("jetbot")
 
-
         self._world.add_physics_callback("moving_objects", callback_fn=self.move_objects_in_random_paths)
         # self._world.add_physics_callback("publish_camera_data", callback_fn=self.publish_camera_data)
         self._world.add_physics_callback("sending_actions", callback_fn=self.send_robot_actions)
@@ -170,18 +195,13 @@ class SuperHotVLN(BaseSample):
         self._camera.add_motion_vectors_to_frame()
         self._camera.add_distance_to_image_plane_to_frame()
         self.bridge = CvBridge()
-        
 
     def publish_camera_data(self):
         print("Publishing camera data...")
         # Capture RGB and Depth images from the camera
         rgb_data = self._camera.get_rgb()
         depth_data = self._camera.get_depth()
-        # print(f"Type of RGB data: {type(rgb_data)} | Type of Depth data: {type(depth_data)}")
-        # print(f"RGB data shape: {rgb_data.shape} | Depth data shape: {depth_data.shape}")
-        # print(f"RGB data type: {rgb_data.dtype} | Depth data type: {depth_data.dtype}")
-        # print(f"RGB data range: {rgb_data}")
-        # Publish the data using ROS2PublisherNode
+
         self.ros2_node.publish_camera_data(rgb_data, depth_data)
 
     def normalize_angle(self, angle):

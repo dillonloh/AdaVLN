@@ -55,6 +55,10 @@ class SuperHotVLNExtension(BaseSampleExtension):
         self.sample._input_usd_path = val.get_value_as_string()
         return
     
+    def _input_task_details_path_event(self, val):
+        self.sample._task_details_path = val.get_value_as_string()
+        return
+    
     def post_reset_button_event(self):
         self.task_ui_elements["Move Forward"].enabled = True
         self.task_ui_elements["Turn Left"].enabled = True
@@ -108,5 +112,17 @@ class SuperHotVLNExtension(BaseSampleExtension):
                     "on_clicked_fn": self._input_usd_path_event,
                     "use_folder_picker": True,
                     "read_only": False,
+                    "default_val": "/home/dillon/0Research/VLNAgent/example_dataset/merged/GLAQ4DNUx5U.usd"
                 }
                 self.task_ui_elements["Input USD Path"] = str_builder(**dict)
+
+                dict = {
+                    "label": "Input Task Details Path",
+                    "type": "stringfield",
+                    "tooltip": "Input Task Details Path",
+                    "on_clicked_fn": self._input_task_details_path_event,
+                    "use_folder_picker": True,
+                    "read_only": False,
+                    "default_val": "/home/dillon/0Research/VLNAgent/example_dataset/tasks/GLAQ4DNUx5U.json",
+                }
+                self.task_ui_elements["Input Task Details Path"] = str_builder(**dict)
