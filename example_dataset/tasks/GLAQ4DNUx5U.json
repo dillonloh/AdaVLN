@@ -1,0 +1,13 @@
+[
+    {
+        "distance": 10.86,
+        "scan": "GLAQ4DNUx5",
+        "heading": 3.14,
+        "start_position": [0.0, 0.0, 0.0],
+        "instructions": [
+            "Walk straight ahead until you reach a chair.",
+            "Turn left and and head towards the hallway entrance.",
+            "Go through the hallway entrance all the way into the other room and stop in front of the ladder"
+        ]
+    }
+]
