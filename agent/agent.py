@@ -44,6 +44,11 @@ class RGBDCommandNode(Node):
             qos_profile=rclpy.qos.QoSProfile(depth=1, durability=rclpy.qos.DurabilityPolicy.VOLATILE)
         )
 
+        self.command_reasoning_publisher = self.create_publisher(
+            String, 'command_reasoning',
+            qos_profile=rclpy.qos.QoSProfile(depth=1, durability=rclpy.qos.DurabilityPolicy.VOLATILE)
+        )
+
         # OpenCV bridge for ROS image conversion
         self.bridge = CvBridge()
 
@@ -76,13 +81,20 @@ class RGBDCommandNode(Node):
         print("Processing images...")
         if self.ready_for_command and self.rgb_image is not None and self.depth_image is not None:
             # Process images and get command
-            command = self.get_command_from_openai(self.rgb_image, self.depth_image)
+            reasoning, command = self.get_command_from_openai(self.rgb_image, self.depth_image)
             if command:
                 # Publish command
                 command_msg = String()
                 command_msg.data = command
                 print(f"Publishing command: {command}")
                 self.command_publisher.publish(command_msg)
+
+                # Publish combined JSON as a string to `command_reasoning` topic
+                command_reasoning_msg = String()
+                command_reasoning_msg.data = json.dumps({"decision": command, "reasoning": reasoning})
+                print(f"Publishing command with reasoning: {command_reasoning_msg.data}")
+                print(command_reasoning_msg)
+                self.command_reasoning_publisher.publish(command_reasoning_msg)
 
             # Clear images and reset readiness flag after processing
             self.rgb_image = None
@@ -157,7 +169,7 @@ class RGBDCommandNode(Node):
             # Ensure decision is valid
             if decision in ['turn_left', 'move_forward', 'turn_right', 'stop']:
                 print(f"OpenAI Decision: {decision}, Reasoning: {reasoning}")
-                return decision
+                return reasoning, decision
             else:
                 self.get_logger().warning(f"Invalid decision received: {decision}")
                 return None

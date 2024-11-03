@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Decision Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #image-container {
+            display: flex;
+            gap: 20px;
+        }
+        img {
+            max-width: 300px;
+            border: 1px solid #ccc;
+        }
+        #decision-container {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            width: 50%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Robot Decision Interface</h1>
+    <div id="image-container">
+        <div>
+            <h3>RGB Image</h3>
+            <img id="rgb-image" src="" alt="RGB Image">
+        </div>
+        <div>
+            <h3>Depth Image</h3>
+            <img id="depth-image" src="" alt="Depth Image">
+        </div>
+    </div>
+    <div id="decision-container">
+        <h3>Decision</h3>
+        <p><strong>Action:</strong> <span id="decision-action">N/A</span></p>
+        <p><strong>Reasoning:</strong> <span id="decision-reasoning">N/A</span></p>
+    </div>
+
+    <script>
+        async function fetchDecisionData() {
+            try {
+                const response = await fetch('/api/decision');
+                const data = await response.json();
+                console.log("Fetched data:", data);
+
+                if (data.rgb_image && data.depth_image) {
+                    document.getElementById('rgb-image').src = data.rgb_image;
+                    document.getElementById('depth-image').src = data.depth_image;
+                } else {
+                    console.log("Image data not available in response.");
+                }
+
+                document.getElementById('decision-action').innerText = data.decision;
+                document.getElementById('decision-reasoning').innerText = data.reasoning;
+
+            } catch (error) {
+                console.error('Error fetching decision data:', error);
+            }
+        }
+
+        setInterval(fetchDecisionData, 5000);
+        fetchDecisionData();
+    </script>
+</body>
+</html>
