@@ -102,7 +102,6 @@ class SuperHotVLN(BaseSample):
         settings.set(navmesh_setting_path, False)
         settings.set(dynamic_collision_path, False)
         
-        self._moving_objects = []
         self._input_usd_path = None
         self._task_details_path = None
         self._task_details_list = None
@@ -174,22 +173,6 @@ class SuperHotVLN(BaseSample):
                 resolution=(1280, 720),
             )
         )
-
-        # Add random moving objects (e.g., cubes)
-        for i in range(5):  # Add 5 random objects
-            random_position = [random.uniform(-5, 5), random.uniform(-5, 5), 0.5]
-            random_object_prim_path = f"/World/RandomObject_{i}"
-            world.scene.add(
-                VisualCuboid(
-                    prim_path=random_object_prim_path,
-                    name=f"random_object_{i}",
-                    position=random_position,
-                    scale=np.array([0.5015, 0.5015, 0.5015]), # most arguments accept mainly numpy arrays.
-                    color=np.array([0, 0, 1.0]), # RGB channels, going from 0-1
-                )
-            )
-            self._moving_objects.append(world.scene.get_object(f"random_object_{i}"))
-
         return
 
     async def setup_post_load(self):
@@ -237,17 +220,6 @@ class SuperHotVLN(BaseSample):
     def normalize_angle(self, angle):
         """Normalize an angle to the range [-pi, pi]."""
         return (angle + np.pi) % (2 * np.pi) - np.pi
-
-    def move_objects_in_random_paths(self, step_size):
-        print("Moving objects in random paths...")
-        # Move each object in a random direction with a small step size
-        for i, obj in enumerate(self._moving_objects):
-            # Generate a random direction and move the object slightly
-            random_direction = np.array([random.uniform(-0.1, 0.1), random.uniform(-0.1, 0.1), 0])
-            current_position, current_orientation = obj.get_world_pose()
-            new_position = np.array(current_position) + random_direction
-            print(f"Object {i+1} current position: {current_position}")
-            obj.set_world_pose(new_position.tolist(), current_orientation)
 
     def send_robot_actions(self, step_size):
         print("Sending robot actions...")
