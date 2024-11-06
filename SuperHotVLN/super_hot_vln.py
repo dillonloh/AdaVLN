@@ -18,6 +18,7 @@ import omni.isaac.core.utils.prims as prims_utils
 from omni.isaac.sensor import Camera
 import omni.isaac.core.utils.numpy.rotations as rot_utils
 import omni.kit.actions.core
+from omni.physx import get_physx_scene_query_interface
 import carb
 
 from omni.anim.people.ui_components.command_setting_panel.command_text_widget import CommandTextWidget
@@ -108,6 +109,7 @@ class SuperHotVLN(BaseSample):
         self._jetbot = self._world.scene.get_object("jetbot")
 
         self._world.add_physics_callback("sending_actions", callback_fn=self.send_robot_actions)
+        self._world.add_physics_callback("checking_collisions", callback_fn=self.check_collision)
 
         self._jetbot_controller = DifferentialController(name="jetbot_control", wheel_radius=0.035, wheel_base=0.1)
         self._current_command = None
@@ -163,6 +165,25 @@ class SuperHotVLN(BaseSample):
             self._target_yaw = handle_robot_turn_command(current_yaw, TURN_ANGLE=0.52, turn_direction="right", target_yaw=self._target_yaw, jetbot=self._jetbot, jetbot_controller=self._jetbot_controller)
             if self._target_yaw is None:
                 self._current_command = None
+
+    def check_collision(self, step_size): # TODO: somehow implement this hacky method
+        """
+        Checks if anything is within radius distance from robot's center
+        """
+        position, orientation_quat = self._jetbot.get_world_pose()
+        x, y, z = position[0], position[1], position[2]
+
+        RADIUS = 1 # we just hardcode a threshold of 1 unit for now
+        origin = carb.Float3(x, y, RADIUS + 0.01) # z is set so sphere avoids touching ground plane
+        
+        print(f"Origin: {origin}")
+        numHits = get_physx_scene_query_interface().overlap_sphere(RADIUS, origin, lambda hit : True, False)
+        print(f"Number of hits: {numHits}, Radius: {RADIUS}")
+        
+        # From my testing, robot will have 6 hits from self-collision for the above origin z
+        # Hence, any further hits is obstacle
+        if numHits > 9: 
+            print("Collision detected!")
 
     async def setup_pre_reset(self):
         return
