@@ -9,7 +9,8 @@
             "Turn left and and head through the hallway to the room on the other end and stop in front of the white chair",
             "Turn left and head into the bathroom and stop in front of the heater"
         ],
-        "destination": [10.86, 0.0, 0.0]
+        "destination": [10.86, 0.0, 0.0],
+        "humans": [{"spawn": [-9.0, 0.0, 0.0, 0.0], "waypoints": [[-6.0, 0.0, 0.0], [-3.0, 0.0, 0.0]]}]
          
     }
 ]
