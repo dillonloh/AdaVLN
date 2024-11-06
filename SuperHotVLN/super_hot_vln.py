@@ -1,11 +1,3 @@
-# Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto. Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
 import json
 import random
 import time
@@ -41,87 +33,36 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from cv_bridge import CvBridge  
 
-from .anim import *
+from .utils.dynamic_anim import *
+from .utils.robot_movement import *
+from .utils.ros2_publisher import ROS2PublisherNode
 
 enable_extension("omni.anim.people") 
-
-class ROS2PublisherNode(Node):
-    def __init__(self, super_hot_vln):
-        super().__init__("ros2_publisher_node")
-        self.bridge = CvBridge()
-
-        # Set up QoS profile to keep only the last message
-        qos_profile = QoSProfile(
-            history=QoSHistoryPolicy.KEEP_LAST,
-            depth=1,  # Only keep the last message
-            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL  # Ensures data is available to new subscribers
-        )
-
-        self.rgb_publisher = self.create_publisher(Image, "/rgb", qos_profile)
-        self.depth_publisher = self.create_publisher(Image, "/depth", qos_profile)
-        self.super_hot_vln = super_hot_vln
-
-        # Subscribe to the /command topic
-        self.command_subscription = self.create_subscription(
-            String,
-            "/command",
-            self.command_callback,
-            10
-        )
-
-    def command_callback(self, msg):
-        # Update the _current_command and resume simulation
-        print("Received command from agent:", msg.data)
-        command = msg.data
-        if command in ["turn_left", "turn_right", "move_forward", "stop"]:
-            self.super_hot_vln._current_command = command
-            self.super_hot_vln._world.play()  # Resume simulation if it's paused
-
-    def publish_camera_data(self, rgb_data, depth_data):
-        # Convert to numpy arrays to avoid any data persistence issues and ensure compatibility
-        rgb_array = np.array(rgb_data, dtype=np.float32)
-        depth_array = np.array(depth_data, dtype=np.float32)
-        rgb_array = cv2.cvtColor(rgb_array.astype(np.uint8), cv2.COLOR_BGR2RGB)
-
-        # Scale and convert RGB data to 8-bit format
-        rgb_msg = self.bridge.cv2_to_imgmsg((rgb_array * 255).astype(np.uint8), encoding='rgb8')
-        depth_msg = self.bridge.cv2_to_imgmsg(depth_array, encoding='32FC1')
-
-        # Publish the converted messages
-        self.rgb_publisher.publish(rgb_msg)
-        self.depth_publisher.publish(depth_msg)
 
 class SuperHotVLN(BaseSample):
     def __init__(self) -> None:
         super().__init__()
 
-        # For simplicity, lets just not use nav mesh first since difficult to generate useful navmeshes in cramp environment
         settings = carb.settings.get_settings()
-        navmesh_setting_path = "exts/omni.anim.people/navigation_settings/navmesh_enabled"
-        dynamic_collision_path = "exts/omni.anim.people/navigation_settings/dynamic_avoidance_enabled"
-        settings.set(navmesh_setting_path, False)
-        settings.set(dynamic_collision_path, False)
+        settings.set("exts/omni.anim.people/navigation_settings/navmesh_enabled", False)
+        settings.set("exts/omni.anim.people/navigation_settings/dynamic_avoidance_enabled", False)
         
-        self._input_usd_path = None
-        self._task_details_path = None
+        self._input_usd_path = "/home/dillon/0Research/VLNAgent/example_dataset/merged/GLAQ4DNUx5U.usd"
+        self._task_details_path = "/home/dillon/0Research/VLNAgent/example_dataset/tasks/GLAQ4DNUx5U.json"
         self._task_details_list = None
         self._task_num = 0
         self._current_task = None
 
         if not rclpy.ok():
             rclpy.init()
-        self.ros2_node = ROS2PublisherNode(self)  # Initialize ROS2 node with self reference
+        self.ros2_node = ROS2PublisherNode(self)
 
-        # Create and start the ROS 2 executor on a separate thread
         self.executor = MultiThreadedExecutor()
         self.executor.add_node(self.ros2_node)
         self.ros2_thread = threading.Thread(target=self.executor.spin, daemon=True)
         self.ros2_thread.start()
 
-        return
-
     def setup_scene(self):
-
         world = self.get_world()
         
         matterport_env_usd = self._input_usd_path
@@ -130,27 +71,16 @@ class SuperHotVLN(BaseSample):
             self._task_details_list = json.load(f)
         
         self._current_task = self._task_details_list[self._task_num]
-
-        print(f"Task details: {self._task_details_list}")
-        print(f"Current task: {self._current_task}")
-        print(f"Loading Matterport environment from: {matterport_env_usd}")
-        
         matterport_env_prim_path = "/World"
-
         add_reference_to_stage(usd_path=matterport_env_usd, prim_path=matterport_env_prim_path)
-        assets_root_path = get_assets_root_path()
-
-        action_registry = omni.kit.actions.core.get_action_registry()
-        action = action_registry.get_action("omni.kit.viewport.menubar.lighting", "set_lighting_mode_stage")
-        action.execute()
         
+        assets_root_path = get_assets_root_path()
         jetbot_asset_path = assets_root_path + "/Isaac/Robots/Jetbot/jetbot.usd"
         jetbot_prim_path = "/World/Jetbot"
+        
         start_position = self._current_task["start_position"]
         start_orientation = rotvecs_to_quats([0, 0, self._current_task["heading"]])
-        print(f"Start position: {start_position} | Start orientation: {start_orientation}")
 
-        # Add the Jetbot robot
         world.scene.add(
             WheeledRobot(
                 prim_path=jetbot_prim_path,
@@ -163,9 +93,7 @@ class SuperHotVLN(BaseSample):
             )
         )
 
-        # Add the Jetbot camera
         camera_prim_path = "/World/Jetbot/chassis/rgb_camera/jetbot_camera"
-
         world.scene.add(
             Camera(
                 prim_path=camera_prim_path,
@@ -173,14 +101,12 @@ class SuperHotVLN(BaseSample):
                 resolution=(1280, 720),
             )
         )
-        return
 
     async def setup_post_load(self):
         self._start_time = time.time()
         self._world = self.get_world()
         self._jetbot = self._world.scene.get_object("jetbot")
 
-        # self._world.add_physics_callback("publish_camera_data", callback_fn=self.publish_camera_data)
         self._world.add_physics_callback("sending_actions", callback_fn=self.send_robot_actions)
 
         self._jetbot_controller = DifferentialController(name="jetbot_control", wheel_radius=0.035, wheel_base=0.1)
@@ -197,112 +123,46 @@ class SuperHotVLN(BaseSample):
         cmd_lines = generate_cmd_lines(self._current_task['humans'])
         
         load_characters(cmd_lines)
-        print("Characters loaded.")
-        print("Load commands into UI")
         CommandTextWidget.textbox_commands = "\n".join(cmd_lines)
-        print(CommandTextWidget.textbox_commands)
-        print("Commands loaded into UI.")
-        print("Setting up characters...")  
         setup_characters()
-        print("Characters set up.")
         
-        await self._world.reset_async()  # Pause the simulation
-        
+        await self._world.reset_async()
 
     def publish_camera_data(self):
-        print("Publishing camera data...")
-        # Capture RGB and Depth images from the camera
         rgb_data = self._camera.get_rgb()
         depth_data = self._camera.get_depth()
-
         self.ros2_node.publish_camera_data(rgb_data, depth_data)
 
-    def normalize_angle(self, angle):
-        """Normalize an angle to the range [-pi, pi]."""
-        return (angle + np.pi) % (2 * np.pi) - np.pi
-
     def send_robot_actions(self, step_size):
-        print("Sending robot actions...")
-        # Get the current position and orientation (in quaternion) of the robot
         position, orientation_quat = self._jetbot.get_world_pose()
+        r = R.from_quat([orientation_quat[1], orientation_quat[2], orientation_quat[3], orientation_quat[0]])
+        current_yaw = r.as_euler('xyz', degrees=False)[2]
 
-        # Convert quaternion (QW, QX, QY, QZ) to Euler angles (roll, pitch, yaw)
-        r = R.from_quat([orientation_quat[1], orientation_quat[2], orientation_quat[3], orientation_quat[0]])  # (QX, QY, QZ, QW)
-        euler_angles = r.as_euler('xyz', degrees=False)
-        current_yaw = (euler_angles[2])  # Yaw is the third Euler angle (rotation around Z-axis)
-        print(f"Current yaw: {(current_yaw)} radians | Target yaw: {(self._target_yaw)} radians")
-
-        # Handle the stop command: stop the robot and pause simulation
         if self._current_command == "stop":
-            print("Stop command received. Stopping robot and pausing simulation.")
-            self._jetbot.apply_wheel_actions(self._jetbot_controller.forward([0.0, 0.0]))  # Stop the robot's wheels
-            self.publish_camera_data()  # Publish final camera data
-            self._world.pause()  # Pause the simulation
-            self._current_command = None  # Reset command
+            handle_stop_command(self._jetbot, self._jetbot_controller, self._world)
+            self.publish_camera_data()
+            self._current_command = None
             return
         
-        # If no command is active, publish camera data and then pause the simulation
         if self._current_command is None:
-            print("No command found, publishing camera data and pausing simulation.")
-            self.publish_camera_data()  # Publish camera data right before pausing
+            self.publish_camera_data()
             self._world.pause()
             return
 
-        FORWARD_DISTANCE = 0.5  # scene units
-        TURN_ANGLE = 0.52  # radians
-
-        # If a new command is given, calculate the target position/yaw
-        if self._current_command == "move_forward" and self._target_position is None:
-            direction = np.array([np.cos(current_yaw), np.sin(current_yaw)])  # Direction robot is facing
-            self._target_position = position[:2] + direction * FORWARD_DISTANCE  # Move forward by 1 unit
-            print(f"Target position set: {self._target_position}")
-
-        elif self._current_command == "turn_left" and self._target_yaw is None:
-            self._target_yaw = self.normalize_angle(current_yaw + TURN_ANGLE)  # Turn left 30 degrees
-            print(f"Initial yaw: {current_yaw} radians, Target yaw set: {self._target_yaw} radians")
-
-        elif self._current_command == "turn_right" and self._target_yaw is None:
-            self._target_yaw = self.normalize_angle(current_yaw - TURN_ANGLE)  # Turn right 30 degrees
-            print(f"Initial yaw: {current_yaw} radians, Target yaw set: {self._target_yaw} radians")
-
-        # Move the robot forward until the target position is reached
-        if self._current_command == "move_forward" and self._target_position is not None:
-            current_position = position[:2]  # Current 2D position of the robot
-            distance = np.linalg.norm(self._target_position - current_position)
-
-            if distance <= 0.1:  # Target reached within tolerance
-                print("Reached target position.")
+        if self._current_command == "move_forward":
+            self._target_position = handle_robot_move_command(position[:2], current_yaw, self._target_position, self._jetbot, self._jetbot_controller)
+            if self._target_position is None:
                 self._current_command = None
-                self._target_position = None
-            else:
-                throttle, steering = 0.5, 0  # Move forward
-                print(f"Moving forward: distance to target = {distance}")
-                self._jetbot.apply_wheel_actions(self._jetbot_controller.forward([throttle, steering]))
 
-        # Rotate the robot until the target yaw is reached
-        elif self._current_command == "turn_left" and self._target_yaw is not None:
-            yaw_diff = np.abs(current_yaw - self._target_yaw)
-
-            if yaw_diff <= np.radians(1):  # Target yaw reached within 1 degree
-                print("Reached target yaw (left).")
+        elif self._current_command == "turn_left":
+            self._target_yaw = handle_robot_turn_command(current_yaw, TURN_ANGLE=0.52, turn_direction="left", target_yaw=self._target_yaw, jetbot=self._jetbot, jetbot_controller=self._jetbot_controller)
+            if self._target_yaw is None:
                 self._current_command = None
-                self._target_yaw = None
-            else:
-                throttle, steering = 0, 0.5  # Turn left
-                print(f"Turning left: yaw difference = {yaw_diff} radians")
-                self._jetbot.apply_wheel_actions(self._jetbot_controller.forward([throttle, steering]))
 
-        elif self._current_command == "turn_right" and self._target_yaw is not None:
-            yaw_diff = np.abs(current_yaw - self._target_yaw)
-
-            if yaw_diff <= np.radians(1):  # Target yaw reached within 1 degree
-                print("Reached target yaw (right).")
+        elif self._current_command == "turn_right":
+            self._target_yaw = handle_robot_turn_command(current_yaw, TURN_ANGLE=0.52, turn_direction="right", target_yaw=self._target_yaw, jetbot=self._jetbot, jetbot_controller=self._jetbot_controller)
+            if self._target_yaw is None:
                 self._current_command = None
-                self._target_yaw = None
-            else:
-                throttle, steering = 0, -1  # Turn right
-                print(f"Turning right: yaw difference = {yaw_diff} radians")
-                self._jetbot.apply_wheel_actions(self._jetbot_controller.forward([throttle, steering]))
 
     async def setup_pre_reset(self):
         return
@@ -315,9 +175,7 @@ class SuperHotVLN(BaseSample):
         self._prev_position = None
         self._prev_yaw = None
 
-
     def world_cleanup(self):
-        # Ensure ROS2 is shut down when the world is cleaned up
         self.executor.shutdown()
         self.ros2_thread.join()
         if rclpy.ok():
