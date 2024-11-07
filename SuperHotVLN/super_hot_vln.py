@@ -24,6 +24,7 @@ from omni.physx.scripts import utils
 
 import carb
 
+from omni.anim.people.scripts.global_character_position_manager import GlobalCharacterPositionManager
 from omni.anim.people.ui_components.command_setting_panel.command_text_widget import CommandTextWidget
 from pxr import Sdf, Gf, UsdGeom
 from omni.isaac.core.utils import prims
@@ -40,6 +41,8 @@ from cv_bridge import CvBridge
 from .utils.dynamic_anim import *
 from .utils.robot_movement import *
 from .utils.ros2_publisher import ROS2PublisherNode
+from .database.db_utils import db
+from .database.models.world_state import WorldState
 
 enable_extension("omni.anim.people") 
 
@@ -65,6 +68,14 @@ class SuperHotVLN(BaseSample):
         self.executor.add_node(self.ros2_node)
         self.ros2_thread = threading.Thread(target=self.executor.spin, daemon=True)
         self.ros2_thread.start()
+
+        # setup database
+
+        self._db = db
+        self._db.connect(reuse_if_open=True)
+        self._db.create_tables([WorldState])
+
+        self._character_position_manager = GlobalCharacterPositionManager.get_instance()
 
     def setup_scene(self):
         world = self.get_world()
@@ -113,6 +124,7 @@ class SuperHotVLN(BaseSample):
 
         self._world.add_physics_callback("sending_actions", callback_fn=self.send_robot_actions)
         self._world.add_physics_callback("checking_collisions", callback_fn=self.check_collision)
+        self._world.add_physics_callback("storing_data", callback_fn=self.store_data)
 
         self._jetbot_controller = DifferentialController(name="jetbot_control", wheel_radius=0.035, wheel_base=0.1)
         self._current_command = None
@@ -185,7 +197,7 @@ class SuperHotVLN(BaseSample):
             self._target_yaw = handle_robot_turn_command(current_yaw, TURN_ANGLE=0.52, turn_direction="right", target_yaw=self._target_yaw, jetbot=self._jetbot, jetbot_controller=self._jetbot_controller)
             if self._target_yaw is None:
                 self._current_command = None
-
+    
     def check_collision(self, step_size):
         """
         Checks for collisions using raycasting in a 360-degree pattern around the robot.
@@ -250,6 +262,63 @@ class SuperHotVLN(BaseSample):
         else:
             print("No obstacles detected within the specified radius in the X-Y plane.")
 
+    def store_data(self, step_size):
+        """
+        Stores various world state data for analysis later. These include:
+        - Robot position and orientation
+        - Human positions
+        - Actions taken by the robot
+        - Action waypoints
+        """
+
+        # Retrieve the singleton instance of GlobalCharacterPositionManager
+        character_position_manager = GlobalCharacterPositionManager.get_instance()
+
+        # Retrieve robot's position and orientation
+        position, orientation_quat = self._jetbot.get_world_pose()
+        robot_x, robot_y, robot_z = position
+        r = R.from_quat([orientation_quat[1], orientation_quat[2], orientation_quat[3], orientation_quat[0]])
+        robot_yaw = r.as_euler('xyz', degrees=False)[2]
+
+        # Simulation time
+        sim_time = time.time() - self._start_time
+
+        # Retrieve all current human positions
+        human_positions = character_position_manager.get_all_character_pos()
+        print(human_positions
+              )
+        if not human_positions:
+
+            world_state = WorldState(
+            env_id=self._input_usd_path.split("/")[-1].split(".")[0],  # Extract environment ID from USD file name
+            task_id=str(self._task_num),
+            sim_time=sim_time,
+            robot_x=robot_x,
+            robot_y=robot_y,
+            robot_z=robot_z,
+            robot_yaw=robot_yaw
+            )
+        
+        else:
+        
+            human_position = human_positions[0]
+            world_state = WorldState(
+                env_id=self._input_usd_path.split("/")[-1].split(".")[0],  # Extract environment ID from USD file name
+                task_id=str(self._task_num),
+                sim_time=sim_time,
+                robot_x=robot_x,
+                robot_y=robot_y,
+                robot_z=robot_z,
+                robot_yaw=robot_yaw,
+                human_x=human_position.x,
+                human_y=human_position.y,
+                human_z=human_position.z
+            )
+
+        print(f"Storing current world state data: {world_state}")
+        world_state.save()
+        
+
     async def setup_pre_reset(self):
         return
 
@@ -266,3 +335,5 @@ class SuperHotVLN(BaseSample):
         self.ros2_thread.join()
         if rclpy.ok():
             rclpy.shutdown()
+        
+        self._db.close()
