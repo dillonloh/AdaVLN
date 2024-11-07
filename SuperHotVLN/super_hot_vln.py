@@ -1,6 +1,7 @@
 import json
 import random
 import time
+import math
 
 import cv2  
 import numpy as np
@@ -19,6 +20,8 @@ from omni.isaac.sensor import Camera
 import omni.isaac.core.utils.numpy.rotations as rot_utils
 import omni.kit.actions.core
 from omni.physx import get_physx_scene_query_interface
+from omni.physx.scripts import utils
+
 import carb
 
 from omni.anim.people.ui_components.command_setting_panel.command_text_widget import CommandTextWidget
@@ -102,7 +105,7 @@ class SuperHotVLN(BaseSample):
                 resolution=(1280, 720),
             )
         )
-
+        
     async def setup_post_load(self):
         self._start_time = time.time()
         self._world = self.get_world()
@@ -127,8 +130,25 @@ class SuperHotVLN(BaseSample):
         load_characters(cmd_lines)
         CommandTextWidget.textbox_commands = "\n".join(cmd_lines)
         setup_characters()
-        
+
+        characters_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Characters")
+        self.add_boundingcube_collision_to_meshes(characters_prim)
+
         await self._world.reset_async()
+
+    def add_boundingcube_collision_to_meshes(self, prim):
+        """
+        Recursively add bounding cube colliders to all UsdGeom.Mesh children under the given prim.
+        """
+        for child in prim.GetChildren():
+            # Check if the child prim is a UsdGeom.Mesh and that it isnt /World/Characters/Biped_Setup
+            if child.IsA(UsdGeom.Mesh) and not child.GetPath().pathString.startswith("/World/Characters/Biped_Setup"):
+                # Set collider with bounding cube approximation
+                utils.setCollider(child, approximationShape="boundingCube")
+                print(f"Collider added to {child.GetPath().pathString}")
+            
+            # Recursively call this function to process deeper levels
+            self.add_boundingcube_collision_to_meshes(child)
 
     def publish_camera_data(self):
         rgb_data = self._camera.get_rgb()
@@ -166,24 +186,69 @@ class SuperHotVLN(BaseSample):
             if self._target_yaw is None:
                 self._current_command = None
 
-    def check_collision(self, step_size): # TODO: somehow implement this hacky method
+    def check_collision(self, step_size):
         """
-        Checks if anything is within radius distance from robot's center
+        Checks for collisions using raycasting in a 360-degree pattern around the robot.
+        Records details of any detected collisions.
         """
+        # Clear any previous collision data
+        self.collisions = []  # Using an instance variable to store collisions for this method
+
+        # Get robot position and orientation
         position, orientation_quat = self._jetbot.get_world_pose()
         x, y, z = position[0], position[1], position[2]
 
-        RADIUS = 1 # we just hardcode a threshold of 1 unit for now
-        origin = carb.Float3(x, y, RADIUS + 0.01) # z is set so sphere avoids touching ground plane
+        # Raycast parameters
+        ray_distance = 0.5  # The maximum distance to check for obstacles
+        num_rays = 36       # Number of rays in 360 degrees
+        angle_step = 360 / num_rays
+        origin = carb.Float3(x, y, z + 0.1)  # Start position slightly above ground
+
+        collision_detected = False
+
+        def report_raycast(hit):
+            """
+            Callback for handling raycast hits. Records collision details and stops further raycasting.
+            """
+            # Check for collision type (e.g., with a character or building)
+            if hit.collision.startswith("/World/Characters"):
+                # Append hit details to the collisions list
+                self.collisions.append({"collision": hit.collision})
+                character_name = hit.collision.split("/")[-1]  # Extract character name
+                print(f"Collision detected with a human: {character_name}")
+                return False
+            elif hit.collision.startswith("/World/Building"):
+                self.collisions.append({"collision": hit.collision})
+                print("Collision detected with the building.")
+                return False
+            # If neither of the above, likely is internal collision so we ignore it
+            return True # continue finding other collisions
         
-        print(f"Origin: {origin}")
-        numHits = get_physx_scene_query_interface().overlap_sphere(RADIUS, origin, lambda hit : True, False)
-        print(f"Number of hits: {numHits}, Radius: {RADIUS}")
-        
-        # From my testing, robot will have 6 hits from self-collision for the above origin z
-        # Hence, any further hits is obstacle
-        if numHits > 9: 
-            print("Collision detected!")
+        # Perform raycasting in a circular pattern around the robot
+        for i in range(num_rays):
+            if collision_detected:
+                break  # Exit loop if a collision has been detected
+
+            angle_rad = math.radians(i * angle_step)
+            direction = carb.Float3(math.cos(angle_rad), math.sin(angle_rad), 0.0)
+
+            # Perform raycast in the specified direction
+            hit = get_physx_scene_query_interface().raycast_all(origin, direction, ray_distance, report_raycast)
+
+            # Check if any collisions were recorded
+            if self.collisions:
+                collision_detected = True
+
+        # Print collision details if any were detected
+        if self.collisions:
+            print("Collision details:")
+            for i, collision in enumerate(self.collisions, start=1):
+                print(f"Collision {i}:")
+                for key, value in collision.items():
+                    print(f"  {key}: {value}")
+                print()  # Newline for readability
+        else:
+            print("No obstacles detected within the specified radius in the X-Y plane.")
 
     async def setup_pre_reset(self):
         return
