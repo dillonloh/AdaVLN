@@ -1,5 +1,5 @@
 import os
-from peewee import *
+from playhouse.sqlite_ext import *
 
-db = SqliteDatabase(os.path.join(os.path.dirname(__file__), 'people.db'))
+db = SqliteExtDatabase(os.path.join(os.path.dirname(__file__), 'people.db'))
 

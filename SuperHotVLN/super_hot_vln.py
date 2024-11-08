@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+import omni.anim.graph.core as ag
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.nucleus import get_assets_root_path
 from omni.isaac.core.utils.numpy import rotvecs_to_quats
@@ -271,9 +272,6 @@ class SuperHotVLN(BaseSample):
         - Action waypoints
         """
 
-        # Retrieve the singleton instance of GlobalCharacterPositionManager
-        character_position_manager = GlobalCharacterPositionManager.get_instance()
-
         # Retrieve robot's position and orientation
         position, orientation_quat = self._jetbot.get_world_pose()
         robot_x, robot_y, robot_z = position
@@ -283,41 +281,43 @@ class SuperHotVLN(BaseSample):
         # Simulation time
         sim_time = time.time() - self._start_time
 
-        # Retrieve all current human positions
-        human_positions = character_position_manager.get_all_character_pos()
-        print(human_positions
-              )
-        if not human_positions:
+        # Gather all character positions as a list of dictionaries
+        character_positions = []
+        characters = ag.get_characters()  # Assuming ag.get_characters() returns a list of character objects
 
-            world_state = WorldState(
+        for index, character in enumerate(characters):
+            pos = carb.Float3(0, 0, 0)
+            rot = carb.Float4(0, 0, 0, 0)
+            character.get_world_transform(pos, rot)  # Retrieve the position and rotation
+
+            # If position data is available, store it; otherwise, skip or log missing data
+            if pos:
+                character_data = {
+                    "character_id": f"character_{index}",  # Replace with actual character ID if available
+                    "pos_x": pos.x,
+                    "pos_y": pos.y,
+                    "pos_z": pos.z
+                }
+                character_positions.append(character_data)
+                print(f"Character {index} position: ({pos.x:.2f}, {pos.y:.2f}, {pos.z:.2f})")
+            else:
+                print(f"Character {index} position data not available.")
+
+        # Create the WorldState entry with characters stored as JSON
+        world_state = WorldState.create(
             env_id=self._input_usd_path.split("/")[-1].split(".")[0],  # Extract environment ID from USD file name
             task_id=str(self._task_num),
             sim_time=sim_time,
             robot_x=robot_x,
             robot_y=robot_y,
             robot_z=robot_z,
-            robot_yaw=robot_yaw
-            )
-        
-        else:
-        
-            human_position = human_positions[0]
-            world_state = WorldState(
-                env_id=self._input_usd_path.split("/")[-1].split(".")[0],  # Extract environment ID from USD file name
-                task_id=str(self._task_num),
-                sim_time=sim_time,
-                robot_x=robot_x,
-                robot_y=robot_y,
-                robot_z=robot_z,
-                robot_yaw=robot_yaw,
-                human_x=human_position.x,
-                human_y=human_position.y,
-                human_z=human_position.z
-            )
+            robot_yaw=robot_yaw,
+            characters=character_positions  # Store the list of characters as JSON
+        )
 
-        print(f"Storing current world state data: {world_state}")
-        world_state.save()
-        
+        # Print a summary of the stored state
+        print(f"Stored World State at time {sim_time:.2f}s - Robot: ({robot_x:.2f}, {robot_y:.2f}, {robot_z:.2f}), Yaw: {robot_yaw:.2f}")
+        print(f"Included {len(character_positions)} characters in the state.")
 
     async def setup_pre_reset(self):
         return
