@@ -81,12 +81,6 @@ class SuperHotVLN(BaseSample):
 
         if not rclpy.ok():
             rclpy.init()
-        self.ros2_node = ROS2PublisherNode(self)
-
-        self.executor = MultiThreadedExecutor()
-        self.executor.add_node(self.ros2_node)
-        self.ros2_thread = threading.Thread(target=self.executor.spin, daemon=True)
-        self.ros2_thread.start()
 
         # setup database
 
@@ -95,7 +89,17 @@ class SuperHotVLN(BaseSample):
         self._db.create_tables([WorldState])
     
     def setup_scene(self):
-        
+
+        if not rclpy.ok():
+            rclpy.init()
+            
+        self.ros2_node = ROS2PublisherNode(self)
+
+        self.executor = MultiThreadedExecutor()
+        self.executor.add_node(self.ros2_node)
+        self.ros2_thread = threading.Thread(target=self.executor.spin, daemon=True)
+        self.ros2_thread.start()
+
         world = self.get_world()
         
         with open(self._task_details_path, "r") as f:
