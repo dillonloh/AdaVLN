@@ -1,5 +1,6 @@
 ## anim use
 import json
+import os
 import random
 import time
 
@@ -16,6 +17,9 @@ from omni.anim.people.ui_components.command_setting_panel.command_text_widget im
 from pxr import Sdf, Gf, UsdGeom
 from omni.isaac.core.utils import prims
 
+settings = carb.settings.get_settings()
+settings.set("exts/omni.anim.people/navigation_settings/navmesh_enabled", False)
+settings.set("exts/omni.anim.people/navigation_settings/dynamic_avoidance_enabled", False)
 
 PERSISTENT_SETTINGS_PREFIX = "/persistent"
 class PeopleSettings:
@@ -247,11 +251,8 @@ def setup_characters():
             attr = prim.GetAttribute("omni:scripting:scripts")
 
             setting_dict = carb.settings.get_settings()
-            ext_path = setting_dict.get(PeopleSettings.BEHAVIOR_SCRIPT_PATH)
-            if not ext_path:
-                ext_path = omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__) + "/omni/anim/people/scripts/character_behavior.py"
-                # temporary workaround because idk the api to get root path of isaac sim
-                ext_path = ext_path.replace("exts/omni.isaac.examples", "extscache/omni.anim.people-0.5.0")
+
+            ext_path = os.path.join(os.path.dirname(__file__), "character_behavior.py")
             print(f"Setting up character behavior script: {ext_path}")
             attr.Set([r"{}".format(ext_path)])
 

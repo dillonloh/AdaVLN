@@ -29,14 +29,10 @@ from omni.anim.people.ui_components.command_setting_panel.command_text_widget im
 from pxr import Sdf, Gf, UsdGeom
 from omni.isaac.core.utils import prims
 
-import rclpy
 import threading
-from rclpy.executors import MultiThreadedExecutor
-from cv_bridge import CvBridge  
 
 from .utils.dynamic_anim import *
 from .utils.robot_movement import *
-from .utils.ros2_publisher import ROS2PublisherNode
 from .database.db_utils import db
 from .database.models.world_state import WorldState
 
@@ -67,6 +63,7 @@ class MyWriter(Writer):
         
 class SuperHotVLN(BaseSample):
     def __init__(self) -> None:
+
         super().__init__()
 
         settings = carb.settings.get_settings()
@@ -79,9 +76,6 @@ class SuperHotVLN(BaseSample):
         self._episode_number = 1
         self._current_task = None
 
-        if not rclpy.ok():
-            rclpy.init()
-
         # setup database
 
         self._db = db
@@ -89,7 +83,12 @@ class SuperHotVLN(BaseSample):
         self._db.create_tables([WorldState])
     
     def setup_scene(self):
-
+        
+        import rclpy
+        from rclpy.executors import MultiThreadedExecutor
+        from cv_bridge import CvBridge  
+        from .utils.ros2_publisher import ROS2PublisherNode
+    
         if not rclpy.ok():
             rclpy.init()
             
@@ -379,6 +378,8 @@ class SuperHotVLN(BaseSample):
         self._prev_yaw = None
 
     def world_cleanup(self):
+        import rclpy
+
         print("cleaning up world")
         self.executor.shutdown()
         self.ros2_thread.join()
