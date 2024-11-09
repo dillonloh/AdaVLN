@@ -25,7 +25,6 @@ from omni.physx.scripts import utils
 
 import carb
 
-from omni.anim.people.scripts.global_character_position_manager import GlobalCharacterPositionManager
 from omni.anim.people.ui_components.command_setting_panel.command_text_widget import CommandTextWidget
 from pxr import Sdf, Gf, UsdGeom
 from omni.isaac.core.utils import prims
@@ -33,10 +32,6 @@ from omni.isaac.core.utils import prims
 import rclpy
 import threading
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy
-from sensor_msgs.msg import Image
-from std_msgs.msg import String
 from cv_bridge import CvBridge  
 
 from .utils.dynamic_anim import *
@@ -47,6 +42,29 @@ from .database.models.world_state import WorldState
 
 enable_extension("omni.anim.people") 
 
+import os
+import omni.replicator.core as rep
+from omni.replicator.core import AnnotatorRegistry, Writer
+from PIL import Image
+
+
+# Replicator Writer for saving frame data
+class MyWriter(Writer):
+    def __init__(self, rgb: bool = True, distance_to_camera: bool = False):
+        self._frame_id = 0
+        self.file_path = os.path.join(os.getcwd(), "_out_mc_writer", "")
+        os.makedirs(self.file_path, exist_ok=True)
+
+        # Register annotators based on flags
+        if rgb:
+            self.annotators.append(AnnotatorRegistry.get_annotator("rgb"))
+        if distance_to_camera:
+            self.annotators.append(AnnotatorRegistry.get_annotator("distance_to_camera"))
+
+    def write(self, data):
+        pass
+        self._frame_id += 1
+        
 class SuperHotVLN(BaseSample):
     def __init__(self) -> None:
         super().__init__()
@@ -54,11 +72,11 @@ class SuperHotVLN(BaseSample):
         settings = carb.settings.get_settings()
         settings.set("exts/omni.anim.people/navigation_settings/navmesh_enabled", False)
         settings.set("exts/omni.anim.people/navigation_settings/dynamic_avoidance_enabled", False)
-        
+        self._input_usd_dir = "/home/dillon/0Research/VLNAgent/example_dataset/merged"
         self._input_usd_path = "/home/dillon/0Research/VLNAgent/example_dataset/merged/GLAQ4DNUx5U.usd"
         self._task_details_path = "/home/dillon/0Research/VLNAgent/example_dataset/tasks/GLAQ4DNUx5U.json"
         self._task_details_list = None
-        self._task_num = 0
+        self._episode_number = 1
         self._current_task = None
 
         if not rclpy.ok():
@@ -75,18 +93,18 @@ class SuperHotVLN(BaseSample):
         self._db = db
         self._db.connect(reuse_if_open=True)
         self._db.create_tables([WorldState])
-
-        self._character_position_manager = GlobalCharacterPositionManager.get_instance()
-
+    
     def setup_scene(self):
+        
         world = self.get_world()
         
+        with open(self._task_details_path, "r") as f:
+            self._task_details_list = json.load(f).get("episodes")
+
+        self._current_task = self._task_details_list[self._episode_number - 1]
+        self._input_usd_path = f"{self._input_usd_dir}/{self._current_task['scene_id']}.usd"
         matterport_env_usd = self._input_usd_path
-        task_details_path = self._task_details_path
-        with open(task_details_path, "r") as f:
-            self._task_details_list = json.load(f)
-        
-        self._current_task = self._task_details_list[self._task_num]
+
         matterport_env_prim_path = "/World"
         add_reference_to_stage(usd_path=matterport_env_usd, prim_path=matterport_env_prim_path)
         
@@ -95,7 +113,7 @@ class SuperHotVLN(BaseSample):
         jetbot_prim_path = "/World/Jetbot"
         
         start_position = self._current_task["start_position"]
-        start_orientation = rotvecs_to_quats([0, 0, self._current_task["heading"]])
+        start_orientation = self._current_task["start_rotation"]
 
         world.scene.add(
             WheeledRobot(
@@ -114,41 +132,65 @@ class SuperHotVLN(BaseSample):
             Camera(
                 prim_path=camera_prim_path,
                 name="jetbot_camera",
-                resolution=(1280, 720),
+                resolution=(1280, 720)
             )
         )
+
+        self.setup_replicator_writers()
+
+    def setup_replicator_writers(self):
+        # Register custom writer and randomizer
+        rep.WriterRegistry.register(MyWriter)
+
+        self._camera_rp = []
         
+        # Define render products
+        rp = rep.create.render_product("/World/Jetbot/chassis/rgb_camera/jetbot_camera", resolution=(1280, 720))
+        self._camera_rp.extend([rp])
+        
+        self._writer = rep.WriterRegistry.get("MyWriter")
+        self._writer.initialize(rgb=True, distance_to_camera=True)
+        self._writer.attach([rp])
+
+        self._rgb = rep.AnnotatorRegistry.get_annotator("LdrColor")
+        self._distance_to_camera = rep.AnnotatorRegistry.get_annotator("distance_to_camera")
+        self._rgb.attach(rp)
+        self._distance_to_camera.attach(rp)
+
     async def setup_post_load(self):
+
         self._start_time = time.time()
         self._world = self.get_world()
         self._jetbot = self._world.scene.get_object("jetbot")
+    
 
         self._world.add_physics_callback("sending_actions", callback_fn=self.send_robot_actions)
         self._world.add_physics_callback("checking_collisions", callback_fn=self.check_collision)
         self._world.add_physics_callback("storing_data", callback_fn=self.store_data)
 
+
         self._jetbot_controller = DifferentialController(name="jetbot_control", wheel_radius=0.035, wheel_base=0.1)
         self._current_command = None
         self._target_position = None
         self._target_yaw = None
-        self._camera = self._world.scene.get_object("jetbot_camera")   
         
-        self._camera.initialize()
-        self._camera.add_motion_vectors_to_frame()
-        self._camera.add_distance_to_image_plane_to_frame()
-        self.bridge = CvBridge()
-
         cmd_lines = generate_cmd_lines(self._current_task['humans'])
         
         load_characters(cmd_lines)
         CommandTextWidget.textbox_commands = "\n".join(cmd_lines)
         setup_characters()
 
+        self.ros2_node.publish_current_task_instruction(self._current_task["instruction"]["instruction_text"])
+
         characters_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Characters")
         self.add_boundingcube_collision_to_meshes(characters_prim)
 
         await self._world.reset_async()
 
+        print(f"Loaded scene with details: {self._current_task}")
+
+        return 
+    
     def add_boundingcube_collision_to_meshes(self, prim):
         """
         Recursively add bounding cube colliders to all UsdGeom.Mesh children under the given prim.
@@ -164,8 +206,10 @@ class SuperHotVLN(BaseSample):
             self.add_boundingcube_collision_to_meshes(child)
 
     def publish_camera_data(self):
-        rgb_data = self._camera.get_rgb()
-        depth_data = self._camera.get_depth()
+        # Using replicator's annotation for image data capture
+        rgb_data = self._rgb.get_data()
+        depth_data = self._distance_to_camera.get_data()
+        
         self.ros2_node.publish_camera_data(rgb_data, depth_data)
 
     def send_robot_actions(self, step_size):
@@ -305,8 +349,8 @@ class SuperHotVLN(BaseSample):
 
         # Create the WorldState entry with characters stored as JSON
         world_state = WorldState.create(
-            env_id=self._input_usd_path.split("/")[-1].split(".")[0],  # Extract environment ID from USD file name
-            task_id=str(self._task_num),
+            scene_id=self._input_usd_path.split("/")[-1].split(".")[0],  # Extract environment ID from USD file name
+            episode_id=str(self._episode_number),
             sim_time=sim_time,
             robot_x=robot_x,
             robot_y=robot_y,
@@ -331,9 +375,30 @@ class SuperHotVLN(BaseSample):
         self._prev_yaw = None
 
     def world_cleanup(self):
+        print("cleaning up world")
         self.executor.shutdown()
         self.ros2_thread.join()
         if rclpy.ok():
             rclpy.shutdown()
         
         self._db.close()
+
+    # change to next episode
+    async def load_next_episode(self):
+        if self._episode_number >= len(self._task_details_list):
+            print("Max episode reached")
+            return
+        self._episode_number += 1
+        self._current_task = self._task_details_list[self._episode_number - 1]
+        self._input_usd_path = f"{self._input_usd_dir}/{self._current_task['scene_id']}.usd"
+        await self.load_world_async()
+
+    # change to previous episode
+    async def load_previous_episode(self):
+        if self._episode_number <= 1:
+            print("Min episode reached")
+            return
+        self._episode_number -= 1
+        self._current_task = self._task_details_list[self._episode_number - 1]
+        self._input_usd_path = f"{self._input_usd_dir}/{self._current_task['scene_id']}.usd"
+        await self.load_world_async()

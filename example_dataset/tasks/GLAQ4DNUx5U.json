@@ -1,16 +1,130 @@
-[
-    {
-        "distance": 10.86,
-        "scan": "GLAQ4DNUx5",
-        "heading": 3.14,
-        "start_position": [0.0, 0.0, 0.2],
-        "instructions": [
-            "Move forward until you reach the first doorway on your left",
-            "Turn left and and head through the hallway to the room on the other end and stop in front of the white chair",
-            "Turn left and head into the bathroom and stop in front of the heater"
-        ],
-        "destination": [10.86, 0.0, 0.0],
-        "humans": [{"spawn": [-9.0, 0.0, 0.0, 0.0], "waypoints": [[-6.0, 0.0, 0.0], [-3.0, 0.0, 0.0]]}]
-         
-    }
-]
+{
+    "episodes": [
+        {
+            "episode_id": 1,
+            "trajectory_id": 1,
+            "scene_id": "GLAQ4DNUx5U",
+            "start_position": [
+                0.0,
+                0.0,
+                0.2
+            ],
+            "start_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "info": {
+                "geodesic_distance": 10.86
+            },
+            "goals": [
+                {
+                    "position": [
+                        10.86,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 3
+                }
+            ],
+            "instruction": {
+                "instruction_text": "Move forward until you reach the chair and then turn left and stop infront of the hallway entrance",
+                "instruction_tokens": [
+                    1067, 159, 2389, 160, 119, 234, 350, 2389, 2289, 764, 227
+                ]
+            },
+            "reference_path": [
+                [0.0, 0.0, 0.2],
+                [5.0, 0.0, 0.2],
+                [10.0, 0.0, 0.2],
+                [10.86, 0.0, 0.0]
+            ],
+            "humans": [{"spawn": [-9.0, 0.0, 0.0, 0.0], "waypoints": [[-6.0, 0.0, 0.0], [-3.0, 0.0, 0.0]]}]
+        },
+        {
+            "episode_id": 2,
+            "trajectory_id": 1,
+            "scene_id": "GLAQ4DNUx5U",
+            "start_position": [
+                0.0,
+                0.0,
+                0.2
+            ],
+            "start_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "info": {
+                "geodesic_distance": 10.86
+            },
+            "goals": [
+                {
+                    "position": [
+                        10.86,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 3
+                }
+            ],
+            "instruction": {
+                "instruction_text": "Turn left in front of the chair and stop before you enter the next room",
+                "instruction_tokens": [
+                    1067, 2389, 227, 15, 119, 1067, 1934, 450, 2389, 2389, 1293, 764, 711, 2389, 2342, 119, 1515, 1237, 1272
+                ]
+            },
+            "reference_path": [
+                [0.0, 0.0, 0.2],
+                [5.0, 0.0, 0.2],
+                [10.0, 0.0, 0.2],
+                [10.86, 0.0, 0.0]
+            ],
+            "humans": [{"spawn": [-5.0, 0.0, 0.0, 0.0], "waypoints": [[-6.0, 0.0, 0.0], [-3.0, 0.0, 0.0]]}]
+        },
+        {
+            "episode_id": 3,
+            "trajectory_id": 1,
+            "scene_id": "GLAQ4DNUx5U",
+            "start_position": [
+                0.0,
+                0.0,
+                0.2
+            ],
+            "start_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "info": {
+                "geodesic_distance": 10.86
+            },
+            "goals": [
+                {
+                    "position": [
+                        10.86,
+                        0.0,
+                        0.0
+                    ],
+                    "radius": 3
+                }
+            ],
+            "instruction": {
+                "instruction_text":  "Turn left at the dining area and move forward until you reach the entrance to the next room and stop",
+                "instruction_tokens": [
+                    1067, 2389, 227, 119, 1067, 1237, 1232, 764, 711, 119, 1272
+                ]
+            },
+            "reference_path": [
+                [0.0, 0.0, 0.2],
+                [5.0, 0.0, 0.2],
+                [10.0, 0.0, 0.2],
+                [10.86, 0.0, 0.0]
+            ],
+            "humans": [{"spawn": [-9.0, -2.0, 0.0, 0.0], "waypoints": [[-6.0, 0.0, 0.0], [-3.0, 0.0, 0.0]]}]
+        }
+    ]
+}

@@ -26,6 +26,7 @@ class ROS2PublisherNode(Node):
 
         self.rgb_publisher = self.create_publisher(Image, "/rgb", qos_profile)
         self.depth_publisher = self.create_publisher(Image, "/depth", qos_profile)
+        self.task_instruction_publisher = self.create_publisher(String, "/current_task_instruction", qos_profile)
         self.super_hot_vln = super_hot_vln
 
         # Subscribe to the /command topic
@@ -46,14 +47,19 @@ class ROS2PublisherNode(Node):
 
     def publish_camera_data(self, rgb_data, depth_data):
         # Convert to numpy arrays to avoid any data persistence issues and ensure compatibility
-        rgb_array = np.array(rgb_data, dtype=np.float32)
-        depth_array = np.array(depth_data, dtype=np.float32)
-        rgb_array = cv2.cvtColor(rgb_array.astype(np.uint8), cv2.COLOR_BGR2RGB)
 
-        # Scale and convert RGB data to 8-bit format
-        rgb_msg = self.bridge.cv2_to_imgmsg((rgb_array * 255).astype(np.uint8), encoding='rgb8')
-        depth_msg = self.bridge.cv2_to_imgmsg(depth_array, encoding='32FC1')
+        try:
+            # Scale and convert RGB data to 8-bit format
+            rgb_msg = self.bridge.cv2_to_imgmsg(rgb_data, encoding='bgra8')
+            depth_msg = self.bridge.cv2_to_imgmsg(depth_data, encoding='32FC1')
 
-        # Publish the converted messages
-        self.rgb_publisher.publish(rgb_msg)
-        self.depth_publisher.publish(depth_msg)
+            # Publish the converted messages
+            self.rgb_publisher.publish(rgb_msg)
+            self.depth_publisher.publish(depth_msg)
+        except Exception as e:
+            print("Error while publishing camera data:", e)
+            
+    def publish_current_task_instruction(self, task_instruction):
+        task_instruction_msg = String()
+        task_instruction_msg.data = task_instruction
+        self.task_instruction_publisher.publish(task_instruction_msg)

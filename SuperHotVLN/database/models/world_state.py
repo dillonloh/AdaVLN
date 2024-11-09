@@ -3,8 +3,8 @@ from playhouse.sqlite_ext import *
 from ..db_utils import db
 
 class WorldState(Model):
-    env_id = CharField()
-    task_id = CharField()
+    scene_id = CharField()
+    episode_id = CharField()
     sim_time = FloatField()
     robot_x = FloatField()
     robot_y = FloatField()
