@@ -16,9 +16,9 @@ from omni.isaac.examples.base_sample import BaseSample
 from omni.isaac.wheeled_robots.robots import WheeledRobot
 from omni.isaac.wheeled_robots.controllers import DifferentialController, WheelBasePoseController
 from omni.isaac.core.objects import VisualCuboid
-import omni.isaac.core.utils.prims as prims_utils
+import omni.isaac.core.utils.prims as prim_utils
 from omni.isaac.sensor import Camera
-import omni.isaac.core.utils.numpy.rotations as rot_utils
+from omni.isaac.core.utils.rotations import euler_angles_to_quat
 import omni.kit.actions.core
 from omni.physx import get_physx_scene_query_interface
 from omni.physx.scripts import utils
@@ -111,6 +111,37 @@ class SuperHotVLN(BaseSample):
         matterport_env_prim_path = "/World"
         add_reference_to_stage(usd_path=matterport_env_usd, prim_path=matterport_env_prim_path)
         
+        # add lighting (based on Default lighting)
+        # Add Dome Light at position (0, 0, 305) with rotation (0, 0, 62.3)
+        dome_light_prim_path = "/World/DomeLight"
+        dome_light = prim_utils.create_prim(
+            dome_light_prim_path,
+            "DomeLight",
+            position=np.array([0.0, 0.0, 305.0]),
+            orientation=euler_angles_to_quat(np.array([0.0, 0.0, 62.3]), degrees=True),  # Rotation in degrees
+            attributes={
+                "inputs:exposure": 9.0,  # Adjust intensity as needed
+                "inputs:intensity": 1.0,  # Adjust intensity as needed
+                "inputs:color": (1.0, 1.0, 1.0),  # White light color
+            }
+        )
+        dome_light.CreateAttribute("visibleInPrimaryRay", Sdf.ValueTypeNames.Bool).Set(False)
+
+        # Add Distant Light at position (0, 0, 305) with rotation (55, 0, 135)
+        distant_light_prim_path = "/World/DistantLight"
+        distant_light = prim_utils.create_prim(
+            distant_light_prim_path,
+            "DistantLight",
+            position=np.array([0.0, 0.0, 305.0]),
+            orientation=euler_angles_to_quat(np.array([55.0, 0.0, 135.0]), degrees=True),  # Rotation in degrees
+            attributes={
+                "inputs:exposure": 10.0,  # Adjust intensity as needed
+                "inputs:intensity": 1.0,  # Adjust intensity as needed
+                "inputs:color": (1.0, 1.0, 1.0),  # White light color
+                "inputs:angle": 0.53,  # White light color
+            }
+        )
+
         assets_root_path = get_assets_root_path()
         jetbot_asset_path = assets_root_path + "/Isaac/Robots/Jetbot/jetbot.usd"
         jetbot_prim_path = "/World/Jetbot"
