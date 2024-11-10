@@ -9,6 +9,7 @@
 
 import asyncio
 import os
+import omni
 import omni.ui as ui
 from omni.isaac.examples.base_sample import BaseSampleExtension
 from omni.isaac.ui.ui_utils import btn_builder, str_builder
@@ -32,7 +33,7 @@ class SuperHotVLNExtension(BaseSampleExtension):
         frame = self.get_frame(index=0)
         self.build_task_controls_ui(frame)
         return
-
+    
     def _on_move_forward_button_event(self):
         # Set the command to move forward and start the simulation
         self.sample._current_command = "move_forward"
@@ -57,6 +58,23 @@ class SuperHotVLNExtension(BaseSampleExtension):
     
     def _input_task_details_path_event(self, val):
         self.sample._task_details_path = val.get_value_as_string()
+        return
+    
+    def _input_episode_number_event(self, val):
+        self.sample._episode_number = int(val.get_value_as_string())
+        return
+    
+    def _on_next_episode(self):
+        async def _on_next_episode_async():
+            await self._sample.load_next_episode()
+            await omni.kit.app.get_app().next_update_async()
+            self._sample._world.add_stage_callback("stage_event_1", self.on_stage_event)
+            self._enable_all_buttons(True)
+            self._buttons["Load World"].enabled = True
+            self.post_load_button_event()
+            self._sample._world.add_timeline_callback("stop_reset_event", self._reset_on_stop_event)
+
+        asyncio.ensure_future(_on_next_episode_async())
         return
     
     def post_reset_button_event(self):
@@ -126,3 +144,25 @@ class SuperHotVLNExtension(BaseSampleExtension):
                     "default_val": "/home/dillon/0Research/VLNAgent/example_dataset/tasks/GLAQ4DNUx5U.json",
                 }
                 self.task_ui_elements["Input Task Details Path"] = str_builder(**dict)
+                dict = {
+                    "label": "Episode Number",
+                    "type": "stringfield",
+                    "tooltip": "Episode Number",
+                    "on_clicked_fn": self._input_episode_number_event,
+                    "use_folder_picker": True,
+                    "read_only": False,
+                    "default_val": "1",
+                }
+                self.task_ui_elements["Episode Number"] = str_builder(**dict)
+
+                # Turn Right Button
+                next_episode_dict = {
+                    "label": "Next Episode",
+                    "type": "button",
+                    "text": "Next Episode",
+                    "tooltip": "Next Episode",
+                    "on_clicked_fn": self._on_next_episode,
+                }
+                self.task_ui_elements["Next Episode"] = btn_builder(**next_episode_dict)
+                self.task_ui_elements["Next Episode"].enabled = True
+                
