@@ -33,7 +33,7 @@ import threading
 
 from .utils.dynamic_anim import *
 from .utils.robot_movement import *
-from .database.db_utils import db
+from .database.db_utils import create_db
 from .database.models.world_state import WorldState
 
 enable_extension("omni.anim.people") 
@@ -76,12 +76,7 @@ class SuperHotVLN(BaseSample):
         self._episode_number = 1
         self._current_task = None
 
-        # setup database
 
-        self._db = db
-        self._db.connect(reuse_if_open=True)
-        self._db.create_tables([WorldState])
-    
     def setup_scene(self):
         
         import rclpy
@@ -172,6 +167,12 @@ class SuperHotVLN(BaseSample):
 
         self.setup_replicator_writers()
 
+        # setup database
+
+        self._db = create_db()
+        self._db.connect(reuse_if_open=True)
+        self._db.create_tables([WorldState])
+    
     def setup_replicator_writers(self):
         # Register custom writer and randomizer
         rep.WriterRegistry.register(MyWriter)
@@ -253,8 +254,9 @@ class SuperHotVLN(BaseSample):
 
         if self._current_command == "stop":
             handle_stop_command(self._jetbot, self._jetbot_controller, self._world)
-            self.publish_camera_data()
             self._current_command = None
+            self._world.pause() # we are done with this episode
+            self._generate_results()
             return
         
         if self._current_command is None:
@@ -438,3 +440,71 @@ class SuperHotVLN(BaseSample):
         self._current_task = self._task_details_list[self._episode_number - 1]
         self._input_usd_path = f"{self._input_usd_dir}/{self._current_task['scene_id']}.usd"
         await self.load_world_async()
+
+
+    # Function to generate the statistics
+    def generate_results(self):
+        # Function to calculate the distance between two points
+        def calculate_distance(point1, point2):
+            return np.linalg.norm(np.array(point1) - np.array(point2))
+
+        # Fetch the rows for the given episode
+        all_rows = WorldState.select().where(WorldState.episode_id == self._episode_number)
+
+        # Initialize variables for statistics
+        total_distance = 0.0
+        last_position = None
+        robot_final_pos = None
+        goal_pos = self._current_task["goals"][0]["position"]
+        goal_radius = self.current_task["goals"][0]["radius"]
+        collision = False
+        oracle_success = False
+        robot_positions = []
+
+        for row in all_rows:
+            robot_pos = np.array([row.robot_x, row.robot_y])
+            robot_positions.append(robot_pos)
+
+            # Calculate total distance moved by the robot
+            if last_position is not None:
+                total_distance += calculate_distance(last_position, robot_pos)
+            
+            # Check if the robot is within 1 unit of any character
+            if row.characters:
+                for character in row.characters:
+                    character_pos = np.array([character['pos_x'], character['pos_y']])
+                    if calculate_distance(robot_pos, character_pos) <= 1.0:
+                        collision = True
+            
+            # Check if the robot is within 3 meters of the goal
+            if calculate_distance(robot_pos, goal_pos) <= goal_radius:
+                oracle_success = True
+
+            last_position = robot_pos  # Update the last position
+
+        # Get final robot position
+        if robot_positions:
+            robot_final_pos = robot_positions[-1]
+
+        # 1) Distance from goal: Compare robot final pos with goal pos
+        final_distance_from_goal = calculate_distance(robot_final_pos, goal_pos)
+
+        # 2) Total distance moved by robot is already calculated in `total_distance`
+
+        # 3) Collision with character: Already checked during iteration
+
+        # 4) Final success: Robot is within 3 meters of the goal and no collisions
+        final_success = (final_distance_from_goal <= goal_radius and not collision)
+
+        # 5) Oracle success rate: Whether the robot was within 3m from goal at ANY point
+        oracle_success_rate = oracle_success
+
+        # Print the results
+        print("####### Episode Statistics #######\n")
+        print(f"Episode {self._episode_number} Statistics:")
+        print(f"1) Final Distance from Goal: {final_distance_from_goal:.2f} meters")
+        print(f"2) Total Distance Moved by Robot: {total_distance:.2f} meters")
+        print(f"3) Collision with Character: {'Yes' if collision else 'No'}")
+        print(f"4) Final Success (Within 3m from goal and no collisions): {'Yes' if final_success else 'No'}")
+        print(f"5) Oracle Success Rate (Ever within 3m from goal): {'Yes' if oracle_success_rate else 'No'}")
+        print("####### End of Episode Statistics #######\n\n")

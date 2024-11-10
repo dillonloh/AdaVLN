@@ -1,6 +1,6 @@
 from playhouse.sqlite_ext import *
 
-from ..db_utils import db
+from ..db_utils import create_db
 
 class WorldState(Model):
     scene_id = CharField()
@@ -13,4 +13,4 @@ class WorldState(Model):
     characters = JSONField(null=True)  # JSON field to store dynamic numbers of characters
 
     class Meta:
-        database = db
+        database = create_db()
