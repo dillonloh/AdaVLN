@@ -1,5 +1,6 @@
 import base64
 import json
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -116,13 +117,23 @@ class RGBDCommandNode(Node):
             Your job is to control a robot with the following instructions:
             - Move forward until you see a chair.
             - Turn left until you face a hallway, then stop.
-
+            
+            You must avoid colliding with all walls and objects. You must not collide with any humans.
+            
             Choose the best decision based on the provided images and return a JSON response with exactly these two fields:
             {
                 "decision": "turn_left/move_forward/turn_right/stop",
                 "reasoning": "Explanation of the choice"
             }
 
+            Here is an explanation of the different commands
+            - turn_left: Rotate the robot to the left 30 degrees.
+            - move_forward: Move the robot forward 1 meter.
+            - turn_right: Rotate the robot to the right 30 degrees.
+            - stop: Stop the robot and declare that you believe you have reached the destination. THIS CAN ONLY BE CALLED ONCE AND SHOULD ONLY BE CALLED
+            WHEN YOU ARE DONE FOLLOWING ALL INSTRUCTIONS.
+
+            
             DO NOT RETURN ANYTHING ELSE. START WITH { AND END WITH }. DO NOT ADD UNNECESSARY ``` OR OTHER FORMATTING.
         '''
 
@@ -149,36 +160,45 @@ class RGBDCommandNode(Node):
             }
         ]
 
-        try:
-            # Call the OpenAI API
-            response = client.chat.completions.create(
-                model="gpt-4o",  # Adjust model as needed
-                messages=messages,
-                max_tokens=50,  # Adjust tokens for JSON output
-                response_format={ "type": "json_object" }
-            )
+        retries = 5
+        for attempt in range(retries):
+            try:
+                # Call the OpenAI API
+                response = client.chat.completions.create(
+                    model="gpt-4o",  # Adjust model as needed
+                    messages=messages,
+                    max_tokens=50,  # Adjust tokens for JSON output
+                    response_format={ "type": "json_object" }
+                )
 
-            # Parse JSON response
-            content = response.choices[0].message.content.strip()
-            parsed_response = json.loads(content)
-            print(parsed_response)
-            # Extract decision and reasoning
-            decision = parsed_response.get("decision")
-            reasoning = parsed_response.get("reasoning")
+                # Parse JSON response
+                content = response.choices[0].message.content.strip()
+                parsed_response = json.loads(content)
+                print(parsed_response)
+                # Extract decision and reasoning
+                decision = parsed_response.get("decision")
+                reasoning = parsed_response.get("reasoning")
+                
+                # Ensure decision is valid
+                if decision in ['turn_left', 'move_forward', 'turn_right', 'stop']:
+                    print(f"OpenAI Decision: {decision}, Reasoning: {reasoning}")
+                    return reasoning, decision
+                else:
+                    self.get_logger().warning(f"Invalid decision received: {decision}")
+                    return None
+            except json.JSONDecodeError as e:
+                self.get_logger().error(f"Failed to parse JSON from OpenAI response: {e}")
+            except Exception as e:
+                self.get_logger().error(f"Error with OpenAI API: {e}")
             
-            # Ensure decision is valid
-            if decision in ['turn_left', 'move_forward', 'turn_right', 'stop']:
-                print(f"OpenAI Decision: {decision}, Reasoning: {reasoning}")
-                return reasoning, decision
-            else:
-                self.get_logger().warning(f"Invalid decision received: {decision}")
-                return None
-        except json.JSONDecodeError as e:
-            self.get_logger().error(f"Failed to parse JSON from OpenAI response: {e}")
-            return None
-        except Exception as e:
-            self.get_logger().error(f"Error with OpenAI API: {e}")
-            return None
+            # If we failed, wait for a bit before retrying
+            if attempt < retries - 1:
+                self.get_logger().info(f"Retrying... Attempt {attempt + 2}/{retries}")
+                time.sleep(2)  # Wait before retrying
+        
+        # If we exhaust retries, return None
+        self.get_logger().error("Max retries reached. Returning None.")
+        return None
 
 def main(args=None):
     rclpy.init(args=args)
