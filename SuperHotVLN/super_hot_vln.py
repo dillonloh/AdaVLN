@@ -218,7 +218,11 @@ class SuperHotVLN(BaseSample):
         self.ros2_node.publish_current_task_instruction(self._current_task["instruction"]["instruction_text"])
 
         characters_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Characters")
+        building_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Building")
+        print(building_prim)
         self.add_boundingcube_collision_to_meshes(characters_prim)
+        self.add_boundingcube_collision_to_meshes(building_prim)
+        self.disable_shadow_casting(building_prim)
 
         await self._world.reset_async()
 
@@ -226,7 +230,7 @@ class SuperHotVLN(BaseSample):
 
         return 
     
-    def add_boundingcube_collision_to_meshes(self, prim):
+    def add_boundingcube_collision_to_meshes(self, prim, approximationShape=None):
         """
         Recursively add bounding cube colliders to all UsdGeom.Mesh children under the given prim.
         """
@@ -234,11 +238,24 @@ class SuperHotVLN(BaseSample):
             # Check if the child prim is a UsdGeom.Mesh and that it isnt /World/Characters/Biped_Setup
             if child.IsA(UsdGeom.Mesh) and not child.GetPath().pathString.startswith("/World/Characters/Biped_Setup"):
                 # Set collider with bounding cube approximation
-                utils.setCollider(child, approximationShape="boundingCube")
-                print(f"Collider added to {child.GetPath().pathString}")
+                if approximationShape is None:
+                    utils.setCollider(child)
+                    print(f"Collider added to {child.GetPath().pathString}")
+                else:
+                    utils.setCollider(child, approximationShape=approximationShape)
+                    print(f"Collider added to {child.GetPath().pathString} with {approximationShape} approximation")
             
             # Recursively call this function to process deeper levels
             self.add_boundingcube_collision_to_meshes(child)
+
+    def disable_shadow_casting(self, prim):
+        """
+        Recursively disable shadow casting to all UsdGeom.Mesh children under the given prim.
+        """
+        for child in prim.GetChildren():
+            
+            child.CreateAttribute("primvars:doNotCastShadows", Sdf.ValueTypeNames.Bool)
+            child.GetAttribute("primvars:doNotCastShadows").Set(True)
 
     def publish_camera_data(self):
         # Using replicator's annotation for image data capture

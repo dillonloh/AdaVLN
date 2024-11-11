@@ -42,10 +42,19 @@ def merge_mesh(input_glb_path, output_usd_path):
     # Apply the rotation to make it permanent
     bpy.ops.object.transform_apply(rotation=True)
 
-    # Export as USD
-    bpy.ops.wm.usd_export(filepath=output_usd_path, export_textures=True)
+    # Create a new collection to represent the /World prim
+    world_collection = bpy.data.collections.new(name="World")
+    bpy.context.scene.collection.children.link(world_collection)
 
-    print(f"USD file exported with no shadows at {output_usd_path}")
+    # Move the Building object to the World collection
+    if merged_object.name in bpy.context.scene.collection.objects:
+        bpy.context.scene.collection.objects.unlink(merged_object)
+    world_collection.objects.link(merged_object)
+
+    # Export as USD without specifying root_prim
+    bpy.ops.wm.usd_export(filepath=output_usd_path, export_textures=True, root_prim_path='/World')
+
+    print(f"USD file exported with Building under /World at {output_usd_path}")
 
 if __name__ == "__main__":
     for file in os.listdir(input_glb_dir):
