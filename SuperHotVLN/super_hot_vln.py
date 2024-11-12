@@ -33,6 +33,7 @@ import threading
 
 from .utils.dynamic_anim import *
 from .utils.robot_movement import *
+from .utils.transforms import *
 from .database.db_utils import create_db
 from .database.models.world_state import WorldState
 
@@ -141,8 +142,9 @@ class SuperHotVLN(BaseSample):
         jetbot_asset_path = assets_root_path + "/Isaac/Robots/Jetbot/jetbot.usd"
         jetbot_prim_path = "/World/Jetbot"
         
-        start_position = self._current_task["start_position"]
-        start_orientation = self._current_task["start_rotation"]
+        start_position = transform_to_sim_position(self._current_task["start_position"])
+        start_orientation = transform_to_sim_rotation(self._current_task["start_rotation"])
+        print(f"Start position: {start_position}, Start orientation: {start_orientation}")
 
         world.scene.add(
             WheeledRobot(
@@ -461,9 +463,6 @@ class SuperHotVLN(BaseSample):
 
     # Function to generate the statistics
     def generate_results(self):
-        # Function to calculate the distance between two points
-        def calculate_distance(point1, point2):
-            return np.linalg.norm(np.array(point1) - np.array(point2))
 
         # Fetch the rows for the given episode
         all_rows = WorldState.select().where(WorldState.episode_id == self._episode_number)
@@ -472,7 +471,7 @@ class SuperHotVLN(BaseSample):
         total_distance = 0.0
         last_position = None
         robot_final_pos = None
-        goal_pos = self._current_task["goals"][0]["position"]
+        goal_pos = transform_to_sim_position(self._current_task["goals"][0]["position"])
         goal_radius = self.current_task["goals"][0]["radius"]
         collision = False
         oracle_success = False

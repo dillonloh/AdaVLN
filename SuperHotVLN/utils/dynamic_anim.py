@@ -17,6 +17,8 @@ from omni.anim.people.ui_components.command_setting_panel.command_text_widget im
 from pxr import Sdf, Gf, UsdGeom
 from omni.isaac.core.utils import prims
 
+from .transforms import *
+
 settings = carb.settings.get_settings()
 settings.set("exts/omni.anim.people/navigation_settings/navmesh_enabled", False)
 settings.set("exts/omni.anim.people/navigation_settings/dynamic_avoidance_enabled", False)
@@ -271,8 +273,11 @@ def generate_cmd_lines(humans_dict):
             name = f"Human_{i}"
             i += 1
         
-        spawn = human.get("spawn")
-        waypoints = human.get("waypoints")
+        spawn = transform_to_sim_position(human.get("spawn")[:-1]) # only transform xyz coordinates
+        spawn.append(human.get("spawn")[-1]) # add back yaw rotation
+
+        waypoints = [transform_to_sim_position(i) for i in human.get("waypoints")]
+        
         spawn_cmd = f"Spawn {name} {spawn[0]} {spawn[1]} {spawn[2]} {spawn[3]}"
         human_cmd_lines.append(spawn_cmd)
         

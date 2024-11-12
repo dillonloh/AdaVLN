@@ -6,14 +6,14 @@
             "scene_id": "GLAQ4DNUx5U",
             "start_position": [
                 0.0,
-                0.0,
-                -1.55
+                -1.55,
+                0.0
             ],
             "start_rotation": [
                 0,
+                1,
                 0,
-                0,
-                1
+                0
             ],
             "info": {
                 "geodesic_distance": 10.86
@@ -21,26 +21,24 @@
             "goals": [
                 {
                     "position": [
-                        10.86,
-                        0.0,
-                        -1.55
+                        -9.0, -1.55, 8.0
                     ],
                     "radius": 3
                 }
             ],
             "instruction": {
-                "instruction_text": "Move forward until you reach the chair and then turn left and stop infront of the hallway entrance",
+                "instruction_text": "Move forward and go past the dining table, then turn left into the room and stop in front of the television.",
                 "instruction_tokens": [
                     1067, 159, 2389, 160, 119, 234, 350, 2389, 2289, 764, 227
                 ]
             },
             "reference_path": [
-                [0.0, 0.0, 0.2],
-                [5.0, 0.0, 0.2],
-                [10.0, 0.0, 0.2],
-                [10.86, 0.0, 0.0]
+                [0.0, -1.55, 0],
+                [-7.5, -1.55, -2.0],
+                [-7.5, -1.55, -8.0],
+                [-9.0, -1.55, 8.0]
             ],
-            "humans": [{"spawn": [-9.0, 0.0, -1.55, 0.0], "waypoints": [[-6.0, 0.0, -1.55], [-3.0, 0.0, -1.55]]}]
+            "humans": [{"spawn": [-9.0, -1.55, 0.0, 0.0], "waypoints": [[-6.0, -1.55, 0.0], [-3.0, -1.55, 0.0]]}]
         },
         {
             "episode_id": 2,
@@ -48,14 +46,14 @@
             "scene_id": "GLAQ4DNUx5U",
             "start_position": [
                 0.0,
-                0.0,
-                -1.55
+                -1.55,
+                0.0
             ],
             "start_rotation": [
                 0,
+                1,
                 0,
-                0,
-                1
+                0
             ],
             "info": {
                 "geodesic_distance": 10.86
@@ -63,26 +61,24 @@
             "goals": [
                 {
                     "position": [
-                        10.86,
-                        0.0,
-                        -1.55
+                        -9.0, -1.55, 8.0
                     ],
                     "radius": 3
                 }
             ],
             "instruction": {
-                "instruction_text": "Turn left in front of the chair and stop before you enter the next room",
+                "instruction_text": "Go past the dining table in front of you and stop at in front of the kitchen counter. Enter the room on your left, head to the far end, and stop in front of the TV.",
                 "instruction_tokens": [
-                    1067, 2389, 227, 15, 119, 1067, 1934, 450, 2389, 2389, 1293, 764, 711, 2389, 2342, 119, 1515, 1237, 1272
+                    1067, 159, 2389, 160, 119, 234, 350, 2389, 2289, 764, 227
                 ]
             },
             "reference_path": [
-                [0.0, 0.0, 0.2],
-                [5.0, 0.0, 0.2],
-                [10.0, 0.0, 0.2],
-                [10.86, 0.0, 0.0]
+                [0.0, -1.55, 0],
+                [-7.5, -1.55, -2.0],
+                [-7.5, -1.55, -8.0],
+                [-9.0, -1.55, 8.0]
             ],
-            "humans": [{"spawn": [-5.0, 0.0, -1.55, 0.0], "waypoints": [[-6.0, 0.0, -1.55], [-3.0, 0.0, -1.55]]}]
+            "humans": [{"spawn": [-9.0, -1.55, 0.0, 0.0], "waypoints": [[-6.0, -1.55, 0.0], [-3.0, -1.55, 0.0]]}]
         },
         {
             "episode_id": 3,
@@ -90,14 +86,14 @@
             "scene_id": "GLAQ4DNUx5U",
             "start_position": [
                 0.0,
-                0.0,
-                -1.55
+                -1.55,
+                0.0
             ],
             "start_rotation": [
                 0,
+                1,
                 0,
-                0,
-                1
+                0
             ],
             "info": {
                 "geodesic_distance": 10.86
@@ -105,26 +101,24 @@
             "goals": [
                 {
                     "position": [
-                        10.86,
-                        0.0,
-                        -1.55
+                        -9.0, -1.55, 8.0
                     ],
                     "radius": 3
                 }
             ],
             "instruction": {
-                "instruction_text":  "Turn left at the dining area and move forward until you reach the entrance to the next room and stop",
+                "instruction_text": "Go to the room in front of the kitchen counter and stop between the TV and the sofa.",
                 "instruction_tokens": [
-                    1067, 2389, 227, 119, 1067, 1237, 1232, 764, 711, 119, 1272
+                    1067, 159, 2389, 160, 119, 234, 350, 2389, 2289, 764, 227
                 ]
             },
             "reference_path": [
-                [0.0, 0.0, 0.2],
-                [5.0, 0.0, 0.2],
-                [10.0, 0.0, 0.2],
-                [10.86, 0.0, 0.0]
+                [0.0, -1.55, 0],
+                [-7.5, -1.55, -2.0],
+                [-7.5, -1.55, -8.0],
+                [-9.0, -1.55, 8.0]
             ],
-            "humans": [{"spawn": [-9.0, -2.0, -1.55, 0.0], "waypoints": [[-6.0, 0.0, -1.55], [-3.0, 0.0, -1.55]]}]
+            "humans": [{"spawn": [-9.0, -1.55, 0.0, 0.0], "waypoints": [[-6.0, -1.55, 0.0], [-3.0, -1.55, 0.0]]}]
         }
     ]
 }
