@@ -18,7 +18,7 @@ from omni.isaac.wheeled_robots.controllers import DifferentialController, WheelB
 from omni.isaac.core.objects import VisualCuboid
 import omni.isaac.core.utils.prims as prim_utils
 from omni.isaac.sensor import Camera
-from omni.isaac.core.utils.rotations import euler_angles_to_quat
+from omni.isaac.core.utils.rotations import euler_angles_to_quat, quat_to_euler_angles
 import omni.kit.actions.core
 from omni.physx import get_physx_scene_query_interface
 from omni.physx.scripts import utils
@@ -159,14 +159,30 @@ class SuperHotVLN(BaseSample):
         )
 
         camera_prim_path = "/World/Jetbot/chassis/rgb_camera/jetbot_camera"
-        world.scene.add(
-            Camera(
+        camera = Camera(
                 prim_path=camera_prim_path,
                 name="jetbot_camera",
-                resolution=(1280, 720)
+                resolution=(1280, 720),
             )
-        )
+        world.scene.add(camera)
 
+
+        # Get the current camera pose and convert to Euler angles
+        current_position, current_rotation = camera.get_world_pose()
+        euler_angles = quat_to_euler_angles(current_rotation, degrees=True)
+
+        # Add 20 degrees to the x-axis (pitch)
+        # this angle was manually found to be a good angle
+        # for making the camera point straight forward
+        euler_angles = [0.0, -20.0, 180.0]
+
+        # Convert back to quaternion for setting the pose
+        new_orientation = euler_angles_to_quat(euler_angles, degrees=True)
+
+        # Apply the new orientation while keeping the same position
+        camera.set_world_pose(
+            orientation=new_orientation
+        )
         self.setup_replicator_writers()
 
         # setup database
