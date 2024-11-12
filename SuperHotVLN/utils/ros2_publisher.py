@@ -50,7 +50,9 @@ class ROS2PublisherNode(Node):
 
         try:
             # Scale and convert RGB data to 8-bit format
-            rgb_msg = self.bridge.cv2_to_imgmsg(rgb_data, encoding='bgra8')
+            rgb_data_bgra = cv2.cvtColor(rgb_data, cv2.COLOR_RGBA2BGRA)
+            
+            rgb_msg = self.bridge.cv2_to_imgmsg(rgb_data_bgra, encoding='bgra8')
             depth_msg = self.bridge.cv2_to_imgmsg(depth_data, encoding='32FC1')
 
             # Publish the converted messages
