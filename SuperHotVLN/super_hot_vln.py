@@ -166,23 +166,20 @@ class SuperHotVLN(BaseSample):
             )
         world.scene.add(camera)
 
+        camera_xform_path = "/World/Jetbot/chassis/rgb_camera"
+        camera_xform = world.stage.GetPrimAtPath(camera_xform_path)
 
-        # Get the current camera pose and convert to Euler angles
-        current_position, current_rotation = camera.get_world_pose()
-        euler_angles = quat_to_euler_angles(current_rotation, degrees=True)
-
-        # Add 20 degrees to the x-axis (pitch)
-        # this angle was manually found to be a good angle
-        # for making the camera point straight forward
-        euler_angles = [0.0, -20.0, 180.0]
-
-        # Convert back to quaternion for setting the pose
-        new_orientation = euler_angles_to_quat(euler_angles, degrees=True)
-
-        # Apply the new orientation while keeping the same position
-        camera.set_world_pose(
-            orientation=new_orientation
+        # This is a hardcoded local transform that works well for pointing the camera straight forward (slight tilt up)
+        new_matrix = Gf.Matrix4d(
+            (0.9739781364270557, 5.967535426946605e-7, 0.226652306401774, 0),
+            (-6.934631969087326e-7, 1.0000015028778466, 8.558670747042332e-7, 0),
+            (-0.22665111823320652, -0.0000013076089426975306, 0.9739772275779269, 0),
+            (0.046500139001482164, -3.386000451406582e-8, 0.06720042363232537, 1)
         )
+
+        # Set the new matrix as the camera transform
+        camera_xform.GetAttribute("xformOp:transform").Set(new_matrix)
+
         self.setup_replicator_writers()
 
         # setup database
