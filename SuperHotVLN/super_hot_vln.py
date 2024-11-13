@@ -76,6 +76,7 @@ class SuperHotVLN(BaseSample):
         self._task_details_list = None
         self._episode_number = 1
         self._current_task = None
+        self._db = None
 
 
     def setup_scene(self):
@@ -184,10 +185,12 @@ class SuperHotVLN(BaseSample):
 
         # setup database
 
-        self._db = create_db()
+        if not self._db:
+            self._db = create_db()
+
         self._db.connect(reuse_if_open=True)
         self._db.create_tables([WorldState])
-    
+
     def setup_replicator_writers(self):
         # Register custom writer and randomizer
         rep.WriterRegistry.register(MyWriter)
