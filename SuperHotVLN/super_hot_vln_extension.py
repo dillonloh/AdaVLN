@@ -12,7 +12,8 @@ import os
 import omni
 import omni.ui as ui
 from omni.isaac.examples.base_sample import BaseSampleExtension
-from omni.isaac.ui.ui_utils import btn_builder, str_builder
+from omni.isaac.ui.ui_utils import btn_builder, str_builder, int_builder
+from omni.isaac.ui import IntField
 from omni.isaac.examples.SuperHotVLN.super_hot_vln import SuperHotVLN
 
 class SuperHotVLNExtension(BaseSampleExtension):
@@ -61,7 +62,7 @@ class SuperHotVLNExtension(BaseSampleExtension):
         return
     
     def _input_episode_number_event(self, val):
-        self.sample._episode_number = int(val.get_value_as_string())
+        self.sample._episode_number = int(val)
         return
     
     def _on_next_episode(self):
@@ -75,6 +76,19 @@ class SuperHotVLNExtension(BaseSampleExtension):
             self._sample._world.add_timeline_callback("stop_reset_event", self._reset_on_stop_event)
 
         asyncio.ensure_future(_on_next_episode_async())
+        return
+    
+    def _on_load_episode(self):
+        async def _on_load_episode_async():
+            await self._sample.load_episode()
+            await omni.kit.app.get_app().next_update_async()
+            self._sample._world.add_stage_callback("stage_event_1", self.on_stage_event)
+            self._enable_all_buttons(True)
+            self._buttons["Load World"].enabled = True
+            self.post_load_button_event()
+            self._sample._world.add_timeline_callback("stop_reset_event", self._reset_on_stop_event)
+
+        asyncio.ensure_future(_on_load_episode_async())
         return
     
     def post_reset_button_event(self):
@@ -129,8 +143,7 @@ class SuperHotVLNExtension(BaseSampleExtension):
                     "tooltip": "Input USD Path",
                     "on_clicked_fn": self._input_usd_path_event,
                     "use_folder_picker": True,
-                    "read_only": False,
-                    "default_val": "/home/dillon/0Research/VLNAgent/example_dataset/merged/GLAQ4DNUx5U.usd"
+                    "read_only": False
                 }
                 self.task_ui_elements["Input USD Path"] = str_builder(**dict)
 
@@ -140,22 +153,30 @@ class SuperHotVLNExtension(BaseSampleExtension):
                     "tooltip": "Input Task Details Path",
                     "on_clicked_fn": self._input_task_details_path_event,
                     "use_folder_picker": True,
-                    "read_only": False,
-                    "default_val": "/home/dillon/0Research/VLNAgent/example_dataset/tasks/GLAQ4DNUx5U.json",
+                    "read_only": False
                 }
                 self.task_ui_elements["Input Task Details Path"] = str_builder(**dict)
+
                 dict = {
                     "label": "Episode Number",
-                    "type": "stringfield",
                     "tooltip": "Episode Number",
-                    "on_clicked_fn": self._input_episode_number_event,
-                    "use_folder_picker": True,
-                    "read_only": False,
-                    "default_val": "1",
+                    "default_value": 1,
+                    "on_value_changed_fn": self._input_episode_number_event,
                 }
-                self.task_ui_elements["Episode Number"] = str_builder(**dict)
-
-                # Turn Right Button
+                self.task_ui_elements["Episode Number"] = IntField(**dict)
+                
+                # Load Episode Button
+                load_episode_dict = {
+                    "label": "Load Episode",
+                    "type": "button",
+                    "text": "Load Episode",
+                    "tooltip": "Load Episode",
+                    "on_clicked_fn": self._on_load_episode,
+                }
+                self.task_ui_elements["Load Episode"] = btn_builder(**load_episode_dict)
+                self.task_ui_elements["Load Episode"].enabled = True
+                
+                # Load Next Episode Button
                 next_episode_dict = {
                     "label": "Next Episode",
                     "type": "button",
@@ -165,4 +186,3 @@ class SuperHotVLNExtension(BaseSampleExtension):
                 }
                 self.task_ui_elements["Next Episode"] = btn_builder(**next_episode_dict)
                 self.task_ui_elements["Next Episode"].enabled = True
-                

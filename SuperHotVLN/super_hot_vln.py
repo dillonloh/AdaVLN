@@ -476,6 +476,19 @@ class SuperHotVLN(BaseSample):
         self._input_usd_path = f"{self._input_usd_dir}/{self._current_task['scene_id']}.usd"
         await self.load_world_async()
 
+    # change to next episode
+    async def load_episode(self):
+        if self._task_details_list is None:
+            with open(self._task_details_path, "r") as f:
+                self._task_details_list = json.load(f).get("episodes")
+
+        if self._episode_number >= len(self._task_details_list):
+            print(f"Invalid episode number {self._episode_number}")
+            raise ValueError(f"Invalid episode number {self._episode_number}")
+        
+        self._current_task = self._task_details_list[self._episode_number - 1]
+        self._input_usd_path = f"{self._input_usd_dir}/{self._current_task['scene_id']}.usd"
+        await self.load_world_async()
 
     # Function to generate the statistics
     def generate_results(self):
