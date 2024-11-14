@@ -9,7 +9,7 @@ from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy
 import numpy as np
 
 from sensor_msgs.msg import Image
-from std_msgs.msg import String
+from std_msgs.msg import String, Int16
 from cv_bridge import CvBridge  
 
 class ROS2PublisherNode(Node):
@@ -27,6 +27,7 @@ class ROS2PublisherNode(Node):
         self.rgb_publisher = self.create_publisher(Image, "/rgb", qos_profile)
         self.depth_publisher = self.create_publisher(Image, "/depth", qos_profile)
         self.task_instruction_publisher = self.create_publisher(String, "/current_task_instruction", qos_profile)
+        self.episode_number_publisher = self.create_publisher(Int16, "/episode_number", qos_profile)
         self.super_hot_vln = super_hot_vln
 
         # Subscribe to the /command topic
@@ -65,3 +66,8 @@ class ROS2PublisherNode(Node):
         task_instruction_msg = String()
         task_instruction_msg.data = task_instruction
         self.task_instruction_publisher.publish(task_instruction_msg)
+
+    def publish_episode_number(self, episode_number):
+        episode_number_msg = Int16()
+        episode_number_msg.data = episode_number
+        self.episode_number_publisher.publish(episode_number_msg)

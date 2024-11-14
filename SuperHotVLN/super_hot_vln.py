@@ -255,7 +255,8 @@ class SuperHotVLN(BaseSample):
         setup_characters()
 
         self.ros2_node.publish_current_task_instruction(self._current_task["instruction"]["instruction_text"])
-
+        self.ros2_node.publish_episode_number(self._episode_number)
+        
         characters_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Characters")
         building_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Building")
         print(building_prim)
