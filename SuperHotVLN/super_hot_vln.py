@@ -166,7 +166,8 @@ class SuperHotVLN(BaseSample):
                 resolution=(1280, 720),
             )
         world.scene.add(camera)
-
+        # set clipping range lower bound small to prevent clipping when robot collide with wall
+        camera.set_clipping_range(0.00001, 1000000)
         camera_xform_path = "/World/Jetbot/chassis/rgb_camera"
         camera_xform = world.stage.GetPrimAtPath(camera_xform_path)
 
