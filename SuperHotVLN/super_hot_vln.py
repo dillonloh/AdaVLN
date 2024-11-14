@@ -72,12 +72,11 @@ class SuperHotVLN(BaseSample):
         settings.set("exts/omni.anim.people/navigation_settings/dynamic_avoidance_enabled", False)
         self._input_usd_dir = "/home/dillon/0Research/VLNAgent/example_dataset/merged"
         self._input_usd_path = "/home/dillon/0Research/VLNAgent/example_dataset/merged/GLAQ4DNUx5U.usd"
-        self._task_details_path = "/home/dillon/0Research/VLNAgent/example_dataset/tasks/GLAQ4DNUx5U.json"
+        self._task_details_path = "/home/dillon/0Research/VLNAgent/example_dataset/tasks/tasks.json"
         self._task_details_list = None
         self._episode_number = 1
         self._current_task = None
         self._db = None
-
 
     def setup_scene(self):
         
@@ -222,12 +221,33 @@ class SuperHotVLN(BaseSample):
         self._world.add_physics_callback("checking_collisions", callback_fn=self.check_collision)
         self._world.add_physics_callback("storing_data", callback_fn=self.store_data)
 
-
-        self._jetbot_controller = DifferentialController(name="jetbot_control", wheel_radius=0.035, wheel_base=0.1)
         self._current_command = None
         self._target_position = None
         self._target_yaw = None
+        self._collision = None
         
+        # Initialize attributes for timeout and collision tracking
+        self.timeout_duration = None
+        self.elapsed_time = 0.0  # Track elapsed time for timeouts
+        self._collision_with_building = False
+
+        # Configurable speeds and distances
+        self.linear_speed = 0.5
+        self.rotation_speed = np.radians(30)
+        self.move_distance = 0.25
+        self.rotation_angle = np.radians(15)
+
+        # Initialize the Differential Controller with speed limits
+        self.wheel_radius = 0.035  # wheel radius in meters
+        self.wheel_base = 0.1  # distance between wheels in meters
+
+        self._jetbot_controller = DifferentialController(name="jetbot_control", wheel_radius=self.wheel_radius, wheel_base=self.wheel_base)
+        self._current_command = None
+        self._initial_position = None
+        self._initial_yaw = None
+        
+        self._collision = None
+
         cmd_lines = generate_cmd_lines(self._current_task['humans'])
         
         load_characters(cmd_lines)
@@ -284,37 +304,59 @@ class SuperHotVLN(BaseSample):
         self.ros2_node.publish_camera_data(rgb_data, depth_data)
 
     def send_robot_actions(self, step_size):
-        position, orientation_quat = self._jetbot.get_world_pose()
-        r = R.from_quat([orientation_quat[1], orientation_quat[2], orientation_quat[3], orientation_quat[0]])
-        current_yaw = r.as_euler('xyz', degrees=False)[2]
-
-        if self._current_command == "stop":
-            handle_stop_command(self._jetbot, self._jetbot_controller, self._world)
-            self._current_command = None
-            self._world.pause() # we are done with this episode
-            self._generate_results()
-            return
-        
         if self._current_command is None:
             self.publish_camera_data()
             self._world.pause()
             return
 
-        if self._current_command == "move_forward":
-            self._target_position = handle_robot_move_command(position[:2], current_yaw, self._target_position, self._jetbot, self._jetbot_controller)
-            if self._target_position is None:
+        # Enforce a 2-second timeout if colliding with the building
+        if self._collision_with_building:
+            print("Collision with building detected. Enforcing 2-second timeout.")
+            if self.elapsed_time == 0.0:
+                self.timeout_duration = 2.0
+            self.elapsed_time += step_size
+            print(f"Elapsed time: {self.elapsed_time:.2f}s")
+
+            if self.elapsed_time >= self.timeout_duration:
+                print("Timeout reached due to collision with building. Stopping action.")
+                handle_stop_command(self._jetbot, self._jetbot_controller, self._world)
                 self._current_command = None
+                self._collision_with_building = False
+                self.elapsed_time = 0.0
+                return
+        else:
+            self.elapsed_time = 0.0
+
+        # Get the current position and yaw of the robot
+        position, orientation_quat = self._jetbot.get_world_pose()
+        r = R.from_quat([orientation_quat[1], orientation_quat[2], orientation_quat[3], orientation_quat[0]])
+        current_yaw = r.as_euler('xyz', degrees=False)[2]
+        current_position = np.array(position[:2])
+
+        # Set the initial position and yaw if starting a new command
+        if self._initial_position is None and self._initial_yaw is None:
+            self._initial_position = current_position
+            self._initial_yaw = current_yaw
+
+        # Process robot commands based on distance or rotation from initial values
+        if self._current_command == "move_forward":
+            if handle_robot_move_command(self._initial_position, current_position, self._jetbot, self._jetbot_controller, self.linear_speed, self.move_distance):
+                self._current_command = None
+                self._initial_position = None
+                self._initial_yaw = None
 
         elif self._current_command == "turn_left":
-            self._target_yaw = handle_robot_turn_command(current_yaw, TURN_ANGLE=0.52, turn_direction="left", target_yaw=self._target_yaw, jetbot=self._jetbot, jetbot_controller=self._jetbot_controller)
-            if self._target_yaw is None:
+            if handle_robot_turn_command(self._initial_yaw, current_yaw, "left", self._jetbot, self._jetbot_controller, self.rotation_speed, self.rotation_angle):
                 self._current_command = None
+                self._initial_position = None
+                self._initial_yaw = None
 
         elif self._current_command == "turn_right":
-            self._target_yaw = handle_robot_turn_command(current_yaw, TURN_ANGLE=0.52, turn_direction="right", target_yaw=self._target_yaw, jetbot=self._jetbot, jetbot_controller=self._jetbot_controller)
-            if self._target_yaw is None:
+            if handle_robot_turn_command(self._initial_yaw, current_yaw, "right", self._jetbot, self._jetbot_controller, self.rotation_speed, self.rotation_angle):
                 self._current_command = None
-    
+                self._initial_position = None
+                self._initial_yaw = None
+
     def check_collision(self, step_size):
         """
         Checks for collisions using raycasting in a 360-degree pattern around the robot.
@@ -333,40 +375,32 @@ class SuperHotVLN(BaseSample):
         angle_step = 360 / num_rays
         origin = carb.Float3(x, y, z + 0.1)  # Start position slightly above ground
 
-        collision_detected = False
-
         def report_raycast(hit):
             """
             Callback for handling raycast hits. Records collision details and stops further raycasting.
             """
             # Check for collision type (e.g., with a character or building)
             if hit.collision.startswith("/World/Characters"):
-                # Append hit details to the collisions list
                 self.collisions.append({"collision": hit.collision})
                 character_name = hit.collision.split("/")[-1]  # Extract character name
                 print(f"Collision detected with a human: {character_name}")
+                self._collision = True
                 return False
             elif hit.collision.startswith("/World/Building"):
                 self.collisions.append({"collision": hit.collision})
                 print("Collision detected with the building.")
+                self._collision = True
+                self._collision_with_building = True  # Flag collision with building
                 return False
-            # If neither of the above, likely is internal collision so we ignore it
-            return True # continue finding other collisions
+            return True  # continue finding other collisions
         
         # Perform raycasting in a circular pattern around the robot
         for i in range(num_rays):
-            if collision_detected:
-                break  # Exit loop if a collision has been detected
-
             angle_rad = math.radians(i * angle_step)
             direction = carb.Float3(math.cos(angle_rad), math.sin(angle_rad), 0.0)
 
             # Perform raycast in the specified direction
-            hit = get_physx_scene_query_interface().raycast_all(origin, direction, ray_distance, report_raycast)
-
-            # Check if any collisions were recorded
-            if self.collisions:
-                collision_detected = True
+            get_physx_scene_query_interface().raycast_all(origin, direction, ray_distance, report_raycast)
 
         # Print collision details if any were detected
         if self.collisions:
@@ -445,6 +479,7 @@ class SuperHotVLN(BaseSample):
         self._target_yaw = None
         self._prev_position = None
         self._prev_yaw = None
+        self._collision = None
 
     def world_cleanup(self):
         import rclpy
