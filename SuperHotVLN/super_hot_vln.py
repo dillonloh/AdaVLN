@@ -305,6 +305,14 @@ class SuperHotVLN(BaseSample):
         self.ros2_node.publish_camera_data(rgb_data, depth_data)
 
     def send_robot_actions(self, step_size):
+
+        if self._current_command == "stop":
+            handle_stop_command(self._jetbot, self._jetbot_controller, self._world)
+            self._current_command = None
+            self._world.pause() # we are done with this episode
+            self._generate_results()
+            return
+        
         if self._current_command is None:
             self.publish_camera_data()
             self._world.pause()
@@ -317,9 +325,10 @@ class SuperHotVLN(BaseSample):
                 self.timeout_duration = 2.0
             self.elapsed_time += step_size
             print(f"Elapsed time: {self.elapsed_time:.2f}s")
-
+            
             if self.elapsed_time >= self.timeout_duration:
                 print("Timeout reached due to collision with building. Stopping action.")
+                self.publish_camera_data()
                 handle_stop_command(self._jetbot, self._jetbot_controller, self._world)
                 self._current_command = None
                 self._collision_with_building = False

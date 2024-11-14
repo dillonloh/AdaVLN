@@ -9,7 +9,7 @@ def handle_stop_command(jetbot, jetbot_controller, world):
     """Stops the robot and pauses the simulation."""
     print("Stop command received. Stopping robot and pausing simulation.")
     jetbot.apply_wheel_actions(jetbot_controller.forward([0.0, 0.0]))
-    world.pause()
+    return True
 
 def handle_robot_move_command(initial_position, current_position, jetbot, jetbot_controller, linear_speed, move_distance):
     """Moves the robot forward until the specified move_distance is reached from the initial position."""
