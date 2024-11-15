@@ -191,8 +191,9 @@ class RGBDCommandNode(Node):
             You are given egocentric RGB-D images with 60 degree FOV. These images are from the perspective of your eyes.
             Take note of this when navigating. Your end goals MUST be in the middle of your perspective and close to you. 
 
-            You must avoid colliding with all walls and objects. You must not collide with any humans.
-
+            You must avoid colliding with all walls and objects. You must not collide with any humans. Colliding here means
+            that you come within 0.2 meters of any object or human. 
+            
             Choose the best decision based on the provided images and return a JSON response with exactly these fields:
             {{
                 "observation": "Description of what you see in the images.",
@@ -211,7 +212,7 @@ class RGBDCommandNode(Node):
             MAKE SURE YOU ONLY STOP WHEN THE OBSERVATIONS IN THE IMAGE MATCH THE TASK INSTRUCTION'S END GOAL.
             DO NOT RETURN ANYTHING ELSE. START WITH {{ AND END WITH }}. DO NOT ADD UNNECESSARY ``` OR OTHER FORMATTING.
 
-            You are also given the following truncated history of your decisions, HOWEVER YOU MIGHT BE
+            You are also given the following truncated history of your plan, HOWEVER YOU MIGHT BE
             HALLUCINATING, SO BE VERY CAREFUL ABOUT HOW YOU USE THIS HISTORY.
         '''
         
@@ -219,7 +220,7 @@ class RGBDCommandNode(Node):
         self.get_logger().info(f"Using the latest {self.history_limit} entries from history.")
         
         history_text = "\n".join([
-            f"Observation: {entry['observation']}\nObstacles: {entry['obstacles']}\nPlan: {entry['plan']}\nReasoning: {entry['reasoning']}\nAction: {entry['decision']}"
+            f"Plan: {entry['plan']}\n"
             for entry in recent_history
         ])
         full_prompt = prompt + "\n\n" + history_text
