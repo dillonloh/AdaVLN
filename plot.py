@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from playhouse.sqlite_ext import *
 
-task_details_path = "/home/dillon/0Research/VLNAgent/example_dataset/tasks/tasks.json"
+task_details_path = "/home/hiverlab-workstation/Research/SuperHotVLN/example_dataset/tasks/tasks.json"
 with open(task_details_path, "r") as f:
     task_details_list = json.load(f).get("episodes")
 episode_number = 1
@@ -16,7 +16,7 @@ goal_radius = current_task["goals"][0]["radius"]
 start_pos = current_task["start_position"]
 
 # Database connection
-db = SqliteExtDatabase("/home/dillon/0Research/VLNAgent/SuperHotVLN/database/people.db")
+db = SqliteExtDatabase("/home/hiverlab-workstation/Research/SuperHotVLN/SuperHotVLN/database/people.db")
 
 # Define the WorldState model
 class WorldState(Model):
@@ -54,6 +54,7 @@ def calculate_distance(point1, point2):
     return np.linalg.norm(np.array(point1) - np.array(point2))
 
 # Function to generate statistics and plot
+
 def generate_statistics_and_plot(episode_number):
     all_rows = WorldState.select().where(WorldState.episode_id == episode_number)
 
@@ -64,12 +65,15 @@ def generate_statistics_and_plot(episode_number):
     dynamic_collision_count = 0
     oracle_success = False
     robot_positions = []
+    human_positions = []
 
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.plot(goal_pos[0], goal_pos[1], 'go', label='Goal Position', markersize=10)
     circle = plt.Circle((goal_pos[0], goal_pos[1]), goal_radius, color='g', fill=False, linestyle='--', label='Success Radius (3m)')
     ax.add_artist(circle)
     ax.plot(start_pos[0], start_pos[1], 'bs', label='Start Position', markersize=10)
+
+    human_legend_added = False  # Flag to ensure one legend entry for humans
 
     for row in all_rows:
         robot_pos = np.array([row.robot_x, row.robot_y])
@@ -82,6 +86,15 @@ def generate_statistics_and_plot(episode_number):
         if row.characters:
             for character in row.characters:
                 character_pos = np.array([character['pos_x'], character['pos_y']])
+                human_positions.append(character_pos)
+
+                # Add the legend only once for human positions
+                if not human_legend_added:
+                    ax.plot(character_pos[0], character_pos[1], 'r.', markersize=4, label='Human Position')
+                    human_legend_added = True
+                else:
+                    ax.plot(character_pos[0], character_pos[1], 'r.', markersize=4)
+
                 dist_to_character = calculate_distance(robot_pos, character_pos)
                 if dist_to_character <= 1.0:
                     collision_count += 1
@@ -113,10 +126,10 @@ def generate_statistics_and_plot(episode_number):
     )
 
     # Plot settings and display
-    min_x = min([pos[0] for pos in robot_positions] + [goal_pos[0]] + [start_pos[0]]) - goal_radius - 1
-    max_x = max([pos[0] for pos in robot_positions] + [goal_pos[0]] + [start_pos[0]]) + goal_radius + 1
-    min_y = min([pos[1] for pos in robot_positions] + [goal_pos[1]] + [start_pos[1]]) - goal_radius - 1
-    max_y = max([pos[1] for pos in robot_positions] + [goal_pos[1]] + [start_pos[1]]) + goal_radius + 1
+    min_x = min([pos[0] for pos in robot_positions + human_positions] + [goal_pos[0]] + [start_pos[0]]) - goal_radius - 1
+    max_x = max([pos[0] for pos in robot_positions + human_positions] + [goal_pos[0]] + [start_pos[0]]) + goal_radius + 1
+    min_y = min([pos[1] for pos in robot_positions + human_positions] + [goal_pos[1]] + [start_pos[1]]) - goal_radius - 1
+    max_y = max([pos[1] for pos in robot_positions + human_positions] + [goal_pos[1]] + [start_pos[1]]) + goal_radius + 1
 
     ax.set_xlim(min_x, max_x)
     ax.set_ylim(min_y, max_y)
@@ -137,7 +150,7 @@ def generate_statistics_and_plot(episode_number):
     )
     fig.text(0.1, 0.1, stats_text, fontsize=12, verticalalignment='center', horizontalalignment='left', bbox=dict(facecolor='white', alpha=0.7))
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f"episode_{episode_number}_plot.png")
 
 # Example usage
 generate_statistics_and_plot(episode_number)
