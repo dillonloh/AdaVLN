@@ -36,6 +36,7 @@ from .utils.robot_movement import *
 from .utils.transforms import *
 from .database.db_utils import create_db
 from .database.models.world_state import WorldState
+from .database.models.navigation_steps import NavigationSteps
 
 enable_extension("omni.anim.people") 
 
@@ -189,7 +190,7 @@ class SuperHotVLN(BaseSample):
             self._db = create_db()
 
         self._db.connect(reuse_if_open=True)
-        self._db.create_tables([WorldState])
+        self._db.create_tables([WorldState, NavigationSteps])
 
     def setup_replicator_writers(self):
         # Register custom writer and randomizer
@@ -212,7 +213,14 @@ class SuperHotVLN(BaseSample):
 
     async def setup_post_load(self):
 
+        # Remove all existing rows for the current episode
+        print(f"Deleting existing WorldState and NavigationSteps entries for episode {self._episode_number}...")
+        WorldState.delete().where(WorldState.episode_id == str(self._episode_number)).execute()
+        NavigationSteps.delete().where(NavigationSteps.episode_id == str(self._episode_number)).execute()
+
         self._start_time = time.time()
+        self._start_nav_log = False
+        self._step_num = 0
         self._world = self.get_world()
         self._jetbot = self._world.scene.get_object("jetbot")
     
@@ -259,7 +267,7 @@ class SuperHotVLN(BaseSample):
         
         characters_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Characters")
         building_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Building")
-        print(building_prim)
+
         self.add_boundingcube_collision_to_meshes(characters_prim)
         self.add_boundingcube_collision_to_meshes(building_prim)
         self.disable_shadow_casting(building_prim)
@@ -307,10 +315,12 @@ class SuperHotVLN(BaseSample):
     def send_robot_actions(self, step_size):
 
         if self._current_command == "stop":
+            self.log_navigation_step("stop", self._step_num, start=True)
             handle_stop_command(self._jetbot, self._jetbot_controller, self._world)
             self._current_command = None
             self._world.pause() # we are done with this episode
             # self.generate_results()
+            self.log_navigation_step("stop", self._step_num, start=False)
             return
         
         if self._current_command is None:
@@ -327,10 +337,12 @@ class SuperHotVLN(BaseSample):
             print(f"Elapsed time: {self.elapsed_time:.2f}s")
             
             if self.elapsed_time >= self.timeout_duration:
-                print("Timeout reached due to collision with building. Stopping action.")
+                print("Timeout reached due to collision with building. Ending action and pausing simulation.")
+                self.log_navigation_step(self._current_command, self._step_num, start=False)
                 self.publish_camera_data()
-                handle_stop_command(self._jetbot, self._jetbot_controller, self._world)
                 self._current_command = None
+                self._initial_position = None
+                self._initial_yaw = None
                 self._collision_with_building = False
                 self.elapsed_time = 0.0
                 return
@@ -348,25 +360,51 @@ class SuperHotVLN(BaseSample):
             self._initial_position = current_position
             self._initial_yaw = current_yaw
 
-        # Process robot commands based on distance or rotation from initial values
         if self._current_command == "move_forward":
+            if not self._start_nav_log:
+                print(f"Starting log for move_forward at step {self._step_num}")
+                self.log_navigation_step("move_forward", self._step_num, start=True)
+                self._start_nav_log = True
+                
             if handle_robot_move_command(self._initial_position, current_position, self._jetbot, self._jetbot_controller, self.linear_speed, self.move_distance):
                 self._current_command = None
                 self._initial_position = None
                 self._initial_yaw = None
+                print(f"Ending log for move_forward at step {self._step_num}")
+                self.log_navigation_step("move_forward", self._step_num, start=False)
+                self._step_num += 1
+                self._start_nav_log = False
 
         elif self._current_command == "turn_left":
+            if not self._start_nav_log:
+                print(f"Starting log for turn_left at step {self._step_num}")
+                self.log_navigation_step("turn_left", self._step_num, start=True)
+                self._start_nav_log = True
+
             if handle_robot_turn_command(self._initial_yaw, current_yaw, "left", self._jetbot, self._jetbot_controller, self.rotation_speed, self.rotation_angle):
                 self._current_command = None
                 self._initial_position = None
                 self._initial_yaw = None
+                print(f"Ending log for turn_left at step {self._step_num}")
+                self.log_navigation_step("turn_left", self._step_num, start=False)
+                self._step_num += 1
+                self._start_nav_log = False
 
         elif self._current_command == "turn_right":
+            if not self._start_nav_log:
+                print(f"Starting log for turn_right at step {self._step_num}")
+                self.log_navigation_step("turn_right", self._step_num, start=True)
+                self._start_nav_log = True
+
             if handle_robot_turn_command(self._initial_yaw, current_yaw, "right", self._jetbot, self._jetbot_controller, self.rotation_speed, self.rotation_angle):
                 self._current_command = None
                 self._initial_position = None
                 self._initial_yaw = None
-
+                print(f"Ending log for turn_right at step {self._step_num}")
+                self.log_navigation_step("turn_right", self._step_num, start=False)
+                self._step_num += 1
+                self._start_nav_log = False
+                
     def check_collision(self, step_size):
         """
         Checks for collisions using raycasting in a 360-degree pattern around the robot.
@@ -422,6 +460,48 @@ class SuperHotVLN(BaseSample):
                 print()  # Newline for readability
         else:
             print("No obstacles detected within the specified radius in the X-Y plane.")
+
+    def log_navigation_step(self, action, step_num, start=True):
+        """
+        Logs navigation steps to the database.
+
+        Args:
+            action (str): The action being logged (e.g., "move_forward", "turn_left").
+            step_num (int): The step number for this action.
+            start (bool): Whether this is the start or end of the action.
+        """
+        position, orientation_quat = self._jetbot.get_world_pose()
+        robot_x, robot_y, robot_z = position
+        r = R.from_quat([orientation_quat[1], orientation_quat[2], orientation_quat[3], orientation_quat[0]])
+        robot_yaw = r.as_euler('xyz', degrees=False)[2]
+
+        sim_time = time.time() - self._start_time
+
+        if start:
+            # Create a new navigation step for action start
+            NavigationSteps.create(
+                scene_id=self._input_usd_path.split("/")[-1].split(".")[0],
+                episode_id=str(self._episode_number),
+                sim_start_time=sim_time,
+                sim_end_time=None,
+                step_num=step_num,
+                action=action,
+                robot_x=robot_x,
+                robot_y=robot_y,
+                robot_z=robot_z,
+                robot_yaw=robot_yaw
+            )
+            print(f"Logged start of {action} at step {step_num}, time: {sim_time:.2f}s")
+        else:
+            # Update the existing navigation step with action end time
+            step = NavigationSteps.get(
+                NavigationSteps.episode_id == str(self._episode_number),
+                NavigationSteps.step_num == step_num,
+                NavigationSteps.action == action
+            )
+            step.sim_end_time = sim_time
+            step.save()
+            print(f"Logged end of {action} at step {step_num}, time: {sim_time:.2f}s")
 
     def store_data(self, step_size):
         """
