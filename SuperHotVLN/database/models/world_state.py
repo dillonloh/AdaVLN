@@ -11,6 +11,7 @@ class WorldState(Model):
     robot_z = FloatField()
     robot_yaw = FloatField()
     characters = JSONField(null=True)  # JSON field to store dynamic numbers of characters
+    collided_with_building = BooleanField()
 
     class Meta:
         database = create_db()

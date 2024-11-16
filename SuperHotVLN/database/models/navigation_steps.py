@@ -13,6 +13,7 @@ class NavigationSteps(Model):
     robot_y = FloatField()
     robot_z = FloatField()
     robot_yaw = FloatField()
+    collided_with_building = BooleanField()
 
     class Meta:
         database = create_db()

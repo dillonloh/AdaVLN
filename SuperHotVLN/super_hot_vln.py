@@ -269,7 +269,7 @@ class SuperHotVLN(BaseSample):
         characters_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Characters")
         building_prim = omni.usd.get_context().get_stage().GetPrimAtPath("/World/Building")
 
-        self.add_boundingcube_collision_to_meshes(characters_prim)
+        # self.add_boundingcube_collision_to_meshes(characters_prim)
         self.add_boundingcube_collision_to_meshes(building_prim)
         self.disable_shadow_casting(building_prim)
 
@@ -462,6 +462,7 @@ class SuperHotVLN(BaseSample):
                     print(f"  {key}: {value}")
                 print()  # Newline for readability
         else:
+            self._collision_with_building = False  # Flag collision with building
             print("No obstacles detected within the specified radius in the X-Y plane.")
 
     def log_navigation_step(self, action, step_num, start=True):
@@ -492,7 +493,8 @@ class SuperHotVLN(BaseSample):
                 robot_x=robot_x,
                 robot_y=robot_y,
                 robot_z=robot_z,
-                robot_yaw=robot_yaw
+                robot_yaw=robot_yaw,
+                collided_with_building = self._collision_with_building
             )
             print(f"Logged start of {action} at step {step_num}, time: {sim_time:.2f}s")
         else:
@@ -500,7 +502,7 @@ class SuperHotVLN(BaseSample):
             step = NavigationSteps.get(
                 NavigationSteps.episode_id == str(self._episode_number),
                 NavigationSteps.step_num == step_num,
-                NavigationSteps.action == action
+
             )
             step.sim_end_time = sim_time
             step.save()
@@ -555,7 +557,8 @@ class SuperHotVLN(BaseSample):
             robot_y=robot_y,
             robot_z=robot_z,
             robot_yaw=robot_yaw,
-            characters=character_positions  # Store the list of characters as JSON
+            characters=character_positions,
+            collided_with_building = self._collision_with_building  # Store the list of characters as JSON
         )
 
         # Print a summary of the stored state
@@ -611,7 +614,7 @@ class SuperHotVLN(BaseSample):
             with open(self._task_details_path, "r") as f:
                 self._task_details_list = json.load(f).get("episodes")
 
-        if self._episode_number >= len(self._task_details_list):
+        if self._episode_number > len(self._task_details_list):
             print(f"Invalid episode number {self._episode_number}")
             raise ValueError(f"Invalid episode number {self._episode_number}")
         
