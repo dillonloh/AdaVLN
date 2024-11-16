@@ -136,7 +136,19 @@ class SuperHotVLNExtension(BaseSampleExtension):
                 }
                 self.task_ui_elements["Turn Right"] = btn_builder(**turn_right_dict)
                 self.task_ui_elements["Turn Right"].enabled = True
-                
+        
+                # Load Next Episode Button
+                stop_dict = {
+                    "label": "Stop",
+                    "type": "button",
+                    "text": "Stop",
+                    "tooltip": "Stop",
+                    "on_clicked_fn": self._on_next_episode,
+                }
+                self.task_ui_elements["Stop"] = btn_builder(**stop_dict)
+                self.task_ui_elements["Stop"].enabled = True
+        
+        
                 dict = {
                     "label": "Input USD Path",
                     "type": "stringfield",
@@ -186,3 +198,4 @@ class SuperHotVLNExtension(BaseSampleExtension):
                 }
                 self.task_ui_elements["Next Episode"] = btn_builder(**next_episode_dict)
                 self.task_ui_elements["Next Episode"].enabled = True
+
