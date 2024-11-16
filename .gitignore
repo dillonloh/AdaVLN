@@ -166,3 +166,4 @@ cython_debug/
 *.cbin
 *.db
 agent/results
+agent/results_backup
