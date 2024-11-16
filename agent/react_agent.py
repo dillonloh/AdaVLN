@@ -115,6 +115,11 @@ class RGBDCommandNode(Node):
         self.get_logger().info(f"Saved {image_type} image to {filename}")
         return filename
     def process_images_if_ready(self):
+        
+        if self.step_count >= 50:
+            self.get_logger().info("Reached maximum step count 50. Ending episode.")
+            return  
+        
         if self.rgb_image is not None and self.depth_image is not None and self.task_instruction is not None:
             self.get_logger().info("All inputs received, beginning reasoning and action generation.")
             self.step_count += 1
