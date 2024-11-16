@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+import omni.kit.viewport.utility as vu
 import omni.anim.graph.core as ag
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.nucleus import get_assets_root_path
@@ -273,7 +274,9 @@ class SuperHotVLN(BaseSample):
         self.disable_shadow_casting(building_prim)
 
         await self._world.reset_async()
-
+        vp_api = vu.get_active_viewport()
+        vp_api.camera_path = "/World/Jetbot/chassis/rgb_camera/jetbot_camera"
+        
         print(f"Loaded scene with details: {self._current_task}")
 
         return 
