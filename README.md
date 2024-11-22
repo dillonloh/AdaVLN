@@ -9,10 +9,7 @@
 
 AdaSimulator is an IsaacSim-based simulator extension that provides a physics-enabled platform for studying the Visual Language Navigation problem in a continuous environment with realistic robots and moving human obstacles. It was introduced as part of the "AdaVLN : Towards Visual Language Navigation in Continuous Indoor Environments with Moving Humans" paper.
 
-<video width="640" height="360" controls>
-  <source src="media/example_sim.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+![Simulation Preview](media/example_sim.gif)
 
 <!-- GETTING STARTED -->
 ## Getting Started
