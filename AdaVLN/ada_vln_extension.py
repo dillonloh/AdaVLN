@@ -14,19 +14,19 @@ import omni.ui as ui
 from omni.isaac.examples.base_sample import BaseSampleExtension
 from omni.isaac.ui.ui_utils import btn_builder, str_builder, int_builder
 from omni.isaac.ui import IntField
-from omni.isaac.examples.SuperHotVLN.super_hot_vln import SuperHotVLN
+from omni.isaac.examples.AdaVLN.ada_vln import AdaVLN
 
-class SuperHotVLNExtension(BaseSampleExtension):
+class AdaVLNExtension(BaseSampleExtension):
     def on_startup(self, ext_id: str):
         super().on_startup(ext_id)
         super().start_extension(
             menu_name="",
             submenu_name="",
-            name="SuperHotVLNExtension",
+            name="AdaVLNExtension",
             title="RobotCommand Controller",
             doc_link="",
-            overview="SuperHotVLNExtension allows you to control the robot via commands like move_forward, turn_left, and turn_right.",
-            sample=SuperHotVLN(),
+            overview="AdaVLNExtension allows you to control the robot via commands like move_forward, turn_left, and turn_right.",
+            sample=AdaVLN(),
             file_path=os.path.abspath(__file__),
             number_of_extra_frames=1,
         )

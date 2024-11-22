@@ -6,7 +6,7 @@ import json
 import math
 
 # Initialize database
-db = SqliteExtDatabase('/home/dillon/0Research/VLNAgent/SuperHotVLN/database/people.db')
+db = SqliteExtDatabase('/home/dillon/0Research/VLNAgent/AdaVLN/database/people.db')
 
 class WorldState(Model):
     scene_id = CharField()

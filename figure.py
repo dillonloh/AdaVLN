@@ -4,7 +4,7 @@ from playhouse.sqlite_ext import *
 import json
 
 # Initialize database
-db = SqliteExtDatabase('/home/dillon/0Research/VLNAgent/SuperHotVLN/database/people.db')
+db = SqliteExtDatabase('/home/dillon/0Research/VLNAgent/AdaVLN/database/people.db')
 
 # Define models
 class WorldState(Model):

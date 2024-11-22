@@ -9,7 +9,7 @@ def calculate_distance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 # Initialize database
-db = SqliteExtDatabase('/home/dillon/0Research/VLNAgent/SuperHotVLN/database/people.db')
+db = SqliteExtDatabase('/home/dillon/0Research/VLNAgent/AdaVLN/database/people.db')
 
 class WorldState(Model):
     scene_id = CharField()

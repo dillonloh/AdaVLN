@@ -64,7 +64,7 @@ class MyWriter(Writer):
         pass
         self._frame_id += 1
         
-class SuperHotVLN(BaseSample):
+class AdaVLN(BaseSample):
     def __init__(self) -> None:
 
         super().__init__()

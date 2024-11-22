@@ -13,7 +13,7 @@ from std_msgs.msg import String, Int16
 from cv_bridge import CvBridge  
 
 class ROS2PublisherNode(Node):
-    def __init__(self, super_hot_vln):
+    def __init__(self, adavln):
         super().__init__("ros2_publisher_node")
         self.bridge = CvBridge()
 
@@ -28,7 +28,7 @@ class ROS2PublisherNode(Node):
         self.depth_publisher = self.create_publisher(Image, "/depth", qos_profile)
         self.task_instruction_publisher = self.create_publisher(String, "/current_task_instruction", qos_profile)
         self.episode_number_publisher = self.create_publisher(Int16, "/episode_number", qos_profile)
-        self.super_hot_vln = super_hot_vln
+        self.adavln = adavln
 
         # Subscribe to the /command topic
         self.command_subscription = self.create_subscription(
@@ -43,8 +43,8 @@ class ROS2PublisherNode(Node):
         print("Received command from agent:", msg.data)
         command = msg.data
         if command in ["turn_left", "turn_right", "move_forward", "stop"]:
-            self.super_hot_vln._current_command = command
-            self.super_hot_vln._world.play()  # Resume simulation if it's paused
+            self.adavln._current_command = command
+            self.adavln._world.play()  # Resume simulation if it's paused
 
     def publish_camera_data(self, rgb_data, depth_data):
         # Convert to numpy arrays to avoid any data persistence issues and ensure compatibility
