@@ -102,11 +102,13 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 To cite this work, please use the following BibTeX entry:
 
 ```
-@inproceedings{,
-  title={AdaVLN: Towards Visual Language Navigation in Continuous Indoor Environments with Moving Humans},
-  author={},
-  booktitle={},
-  year={},
-  organization={},
+@misc{loh2024adavlnvisuallanguagenavigation,
+      title={AdaVLN: Towards Visual Language Navigation in Continuous Indoor Environments with Moving Humans}, 
+      author={Dillon Loh and Tomasz Bednarz and Xinxing Xia and Frank Guan},
+      year={2024},
+      eprint={2411.18539},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2411.18539}, 
 }
 ```
