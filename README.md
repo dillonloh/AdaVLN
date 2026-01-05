@@ -92,6 +92,10 @@ isaacpython agent/react_agent.py
 
 ```
 
+## Acknowledgement
+
+This project is supported via the NVIDIA Academic Grant, including the A100 80GB GPU hardwares, NVIDIA IsaacSim software and Saturn Enterprise cloud.
+
 <!-- LICENSE -->
 ## License
 
